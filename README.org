@@ -1,0 +1,69 @@
+cm-svg adds a svg backend to cm. It is a seperate package depending on
+[[https://github.com/ormf/svg-import-export][svg-import-export]] and the common lisp version of [[https://github.com/ormf/cm][Common Music]].
+
+# Installation
+
+- download  [[https://github.com/ormf/cm][Common Music]], [[https://github.com/ormf/svg-import-export][svg-import-export]] and  [[https://github.com/ormf/cm-svg][cm-svg]]
+
+- Put the downloaded cm folder, svg-import-export folder and cm-svg
+  folder to a place where asdf will find it (or, if using
+  [quicklisp](https://www.quicklisp.org/beta/) into
+  ~/quicklisp/local-projects/ and then
+
+with asdf or quicklisp:
+
+#+BEGIN_SRC lisp
+(require 'cm-svg)
+#+END_SRC
+
+with quicklisp:
+
+#+BEGIN_SRC lisp
+(ql:quickload "cm-svg")
+#+END_SRC
+
+Example:
+#+BEGIN_SRC lisp
+  (in-package :cm)
+
+  (events
+   (process
+     for keynum in '(60 62 64 65 67)
+     output (new midi :time (now) :keynum keynum :duration 0.5)
+     wait 0.5)
+   "/tmp/test.svg"
+   :piano-roll-vis t
+   :staff-system-vis t
+   :showgrid t
+   :x-scale 8)
+
+  ;;; -> "/tmp/test.svg"
+
+#+END_SRC
+
+Importing from svg:
+
+#+BEGIN_SRC lisp
+(defparameter *myseq* (import-events "/tmp/test.svg" :x-scale 1/8))
+#+END_SRC
+
+Converting to MIDI:
+
+#+BEGIN_SRC lisp
+(events
+ (import-events "/tmp/test.svg" :x-scale 1/8)
+ "test.midi"
+ :play nil)
+
+;;; -> "/tmp/test.midi"
+#+END_SRC
+
+When cm-incudine is installed and rts is started the svg file can be
+played in realtime using midi:
+
+#+BEGIN_SRC lisp
+(sprout *myseq* *rts-out*)
+#+END_SRC
+
+**Note:** cm-svg is not a package on its own. It is evaluated within
+the :cm package, extending its functionality.

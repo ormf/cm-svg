@@ -13,32 +13,8 @@
 
 (in-package :cm)
 
-
-;;; class definition of svg-file and assignment of ".svg" file type
-;;; for the events function.
-
-(progn
-  (defclass svg-file (event-file)
-    ((events :initarg :events :initform '() :accessor svg-file-events) ;;; the events to export
-     (global :initarg :global :initform '() :accessor svg-file-global) ;;; unused optional global params
-     (id-hash :initarg :id-hash :initform (make-hash-table) :accessor svg-file-id-hash) ;;; hashtable for the ids of svg elements
-     (view :initarg :view :initform t :accessor svg-file-view)
-     (width :initarg :width :initform nil :accessor width)
-     (x-scale :initarg :x-scale :initform 8 :accessor x-scale) ;;; x-scale of events: 1 is a grid-point in the svg
-     (piano-roll-vis :initarg :piano-roll-vis :initform t :accessor piano-roll-vis) ;;; visibility flag for piano roll layer
-     (staff-system-vis :initarg :staff-system-vis :initform t :accessor staff-system-vis)
-     (showgrid :initarg :showgrid :initform t :accessor showgrid)) ;;; visibility flag for grid
-    #+metaclasses
-    (:metaclass io-class))
-  (defparameter <svg-file> (find-class 'svg-file))
-  (finalize-class <svg-file>)
-  (setf (io-class-file-types <svg-file>)
-        '("*.svg"))
-  (values))
-
-
-  (defun new-id (svg-file id-type)
-    "return a new id of the specified id-type by incrementing a counter
+(defun new-id (svg-file id-type)
+  "return a new id of the specified id-type by incrementing a counter
 stored in a hash table with id-type as keys."
   (incf (gethash id-type (svg-file-id-hash svg-file) 0)))
 
@@ -93,6 +69,11 @@ stored in a hash table with id-type as keys."
        :piano-roll-vis (piano-roll-vis io)
        :staff-system-vis (staff-system-vis io)
        :showgrid (showgrid io)
+       :x-scale (x-scale io)
+       :bar-lines-vis (bar-lines-vis io)
+       :barstepsize (barstepsize io)
+       :startbar (startbar io)
+       :barmultiplier (barmultiplier io)
        :width (or (width io) (endtime (svg-file-events io)))))))
 
 ;;; cm-svg-export initializes a svg-ie:svg-file instance, fills
@@ -109,7 +90,7 @@ stored in a hash table with id-type as keys."
 ;;; channel number before calling svg-ie:export-svg-file.
 
 (defun cm-svg-export (&key events global (staff-system-vis t) (piano-roll-vis t) (fname "/tmp/test.svg")
-                        (showgrid t) (width 10000)
+                        (showgrid t) (width 10000) (x-scale 8) (bar-lines-vis t) (barstepsize 4) (startbar 1) (barmultiplier 1)
                         &allow-other-keys)
   (declare (ignore global))
   (let ((svg-file (make-instance 'svg-ie:svg-file)))
@@ -117,6 +98,8 @@ stored in a hash table with id-type as keys."
           (append
            (list (svg-ie:svg-staff-system svg-file :visible staff-system-vis :width width))
            (list (svg-ie:svg-piano-roll svg-file :visible piano-roll-vis :width width))
+           (list (svg-ie:svg-barlines svg-file :visible bar-lines-vis :width width :x-scale x-scale
+                                      :barstepsize barstepsize :startbar startbar :barmultiplier barmultiplier))
            (list (cons (make-instance 'svg-ie::svg-tl-layer :name "Events" :id "ebenen-id")
                        (sort (mapcar (lambda (chan) (cons (first chan) (reverse (rest chan)))) events)
                              #'string> :key (lambda (x) (slot-value (car x) 'svg-ie::name)))))))
@@ -143,15 +126,29 @@ the elements slot."
                            line)
                      (svg-file-events stream)))))))
 
-(defun chan->color (midi-chan)
+(defun make-colormap (vector)
+  (let* ((color-hash (make-hash-table :test #'equal)))
+    (setf (gethash :vector color-hash) vector)
+    (loop for idx from 0 for elem across vector
+       do (setf (gethash elem color-hash) idx))
+    color-hash))
+
+(defparameter *svg-colormap*
+  (make-colormap
+   #("#000000" "#800000" "#ff0000" "#808000" "#ffff00" "#008000" "#00ff00"
+     "#008080" "#00ffff" "#000080" "#0000ff" "#800080" "#ff00ff" "#aa0000"
+     "#280b0b" "#501616" "#782121" "#a02c2c" "#483737" "#6c5353" "#552200"
+     "#803300" "#aa4400" "#d45500" "#ff6600" "#002255" "#003380" "#0044aa"
+     "#28170b" "#502d16" "#784421" "#a05a2c" "#c87137" "#483e37" "#917c6f"
+     "#6c5d53" "#806600" "#aa8800" "#d4aa00" "#112b00" "#225500" "#338000")))
+
+(defun chan->color (midi-chan &optional (colormap *svg-colormap*))
   "rgb color lookup for the first 16 MIDI channels."
-  (aref #("#000000" "#800000" "#ff0000" "#808000" "#ffff00" "#008000" "#00ff00"
-          "#008080" "#00ffff" "#000080" "#0000ff" "#800080" "#ff00ff" "#aa0000"
-          "#280b0b" "#501616" "#782121" "#a02c2c" "#483737" "#6c5353" "#552200"
-          "#803300" "#aa4400" "#d45500" "#ff6600" "#002255" "#003380" "#0044aa"
-          "#28170b" "#502d16" "#784421" "#a05a2c" "#c87137" "#483e37" "#917c6f"
-          "#6c5d53" "#806600" "#aa8800" "#d4aa00" "#112b00" "#225500" "#338000")
+  (aref (gethash :vector colormap)
         midi-chan))
+
+(defun color->chan (color &optional (colormap *svg-colormap*))
+  (or (and colormap (gethash color colormap)) 0))
 
 (defmethod write-event ((obj midi) (fil svg-file) scoretime)
   "convert a midi object into a freshly allocated svg-line object and
@@ -174,14 +171,14 @@ svg-file."
                                 :id (new-id fil 'line-ids)))))
     (svg-file-insert-line line myid fil)))
 
-(defun svg->midi (file layer x-scale)
+(defun svg->midi (file layer x-scale &key colormap)
     (mapcar
      (lambda (line) (destructuring-bind (time keynum dur color amp) line
-                 color
-                 (new midi :time (float (* x-scale time)) :keynum keynum :duration (float (* x-scale dur)) :amplitude amp)))
+                 (new midi :time (float (* x-scale time)) :keynum keynum :duration (float (* x-scale dur)) :amplitude amp
+                      :channel (color->chan color colormap))))
      (svg-ie::svg->lines :infile file :layer layer :xquantize nil :yquantize nil)))
 
-(defmethod import-events ((file svg-file) &key (seq t) layer (x-scale 1))
+(defmethod import-events ((file svg-file) &key (seq t) layer (x-scale 1) colormap)
   (let ((fil (file-output-filename file)))
     (cond ((or (not seq) (typep seq <seq>)) nil)
           ((eq seq t)
@@ -189,11 +186,16 @@ svg-file."
                  (make-instance
                    <seq>
                    :name
-                    (format nil "~a~a-seq" (filename-name fil) (if layer (format nil "-~a" layer) "")))))
+                   (format nil "~a~a-seq" (filename-name fil)
+                           (if layer (format nil "-~a" layer) "")))))
           (t
            (error "import-events: ~S is not a boolean or seq." seq)))
-    (let ((events (svg->midi fil (or layer "Events") x-scale)))
+    (let ((events (svg->midi fil (or layer "Events") x-scale :colormap colormap)))
       (if (and seq events)
           (progn (setf (container-subobjects seq) events)
                  seq)
           events))))
+
+(export '*SVG-COLORMAP* 'cm)
+(export 'color->chan 'cm)
+(export 'chan->color 'cm)

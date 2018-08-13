@@ -14,4 +14,5 @@
   :depends-on (#:svg-import-export
                #:cm)
   :serial t
-  :components ((:file "cm-svg")))
+  :components ((:file "cm-svg-classes")
+               (:file "cm-svg")))

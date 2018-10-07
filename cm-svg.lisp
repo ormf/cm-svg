@@ -68,9 +68,9 @@ stored in a hash table with id-type as keys."
        :global (svg-file-global io)
        :piano-roll-vis (piano-roll-vis io)
        :staff-system-vis (staff-system-vis io)
+       :bar-lines-vis (bar-lines-vis io)
        :showgrid (showgrid io)
        :x-scale (x-scale io)
-       :bar-lines-vis (bar-lines-vis io)
        :barstepsize (barstepsize io)
        :startbar (startbar io)
        :barmultiplier (barmultiplier io)
@@ -130,17 +130,94 @@ the elements slot."
   (let* ((color-hash (make-hash-table :test #'equal)))
     (setf (gethash :vector color-hash) vector)
     (loop for idx from 0 for elem across vector
-       do (setf (gethash elem color-hash) idx))
+       do (setf (gethash (string-upcase elem) color-hash) idx))
     color-hash))
 
 (defparameter *svg-colormap*
   (make-colormap
-   #("#000000" "#800000" "#ff0000" "#808000" "#ffff00" "#008000" "#00ff00"
-     "#008080" "#00ffff" "#000080" "#0000ff" "#800080" "#ff00ff" "#aa0000"
-     "#280b0b" "#501616" "#782121" "#a02c2c" "#483737" "#6c5353" "#552200"
-     "#803300" "#aa4400" "#d45500" "#ff6600" "#002255" "#003380" "#0044aa"
-     "#28170b" "#502d16" "#784421" "#a05a2c" "#c87137" "#483e37" "#917c6f"
-     "#6c5d53" "#806600" "#aa8800" "#d4aa00" "#112b00" "#225500" "#338000")))
+   #("#000000" "#800000" "#FF0000" "#808000" "#FFFF00" "#008000" "#00FF00"
+     "#008080" "#00FFFF" "#000080" "#0000FF" "#800080" "#FF00FF" "#AA0000"
+     "#280B0B" "#501616" "#782121" "#A02C2C" "#483737" "#6C5353" "#552200"
+     "#803300" "#AA4400" "#D45500" "#FF6600" "#002255" "#003380" "#0044AA"
+     "#28170B" "#502D16" "#784421" "#A05A2C" "#C87137" "#483E37" "#917C6F"
+     "#6C5D53" "#806600" "#AA8800" "#D4AA00" "#112B00" "#225500" "#338000"
+
+     "#000001" "#800001" "#FF0001" "#808001" "#FFFF01" "#008001" "#00FF01"
+     "#008081" "#010000" "#000081" "#000100" "#800081" "#FF0100" "#AA0001"
+     "#280B0C" "#501617" "#782122" "#A02C2D" "#483738" "#6C5354" "#552201"
+     "#803301" "#AA4401" "#D45501" "#FF6601" "#002256" "#003381" "#0044AB"
+     "#28170C" "#502D17" "#784422" "#A05A2D" "#C87138" "#483E38" "#917C70"
+     "#6C5D54" "#806601" "#AA8801" "#D4AA01" "#112B01" "#225501" "#338001"
+
+     "#000002" "#800002" "#FF0002" "#808002" "#FFFF02" "#008002" "#00FF02"
+     "#008082" "#010001" "#000082" "#000101" "#800082" "#FF0101" "#AA0002"
+     "#280B0D" "#501618" "#782123" "#A02C2E" "#483739" "#6C5355" "#552202"
+     "#803302" "#AA4402" "#D45502" "#FF6602" "#002257" "#003382" "#0044AC"
+     "#28170D" "#502D18" "#784423" "#A05A2E" "#C87139" "#483E39" "#917C71"
+     "#6C5D55" "#806602" "#AA8802" "#D4AA02" "#112B02" "#225502" "#338002"
+
+     "#000003" "#800003" "#FF0003" "#808003" "#FFFF03" "#008003" "#00FF03"
+     "#008083" "#010002" "#000083" "#000102" "#800083" "#FF0102" "#AA0003"
+     "#280B0E" "#501619" "#782124" "#A02C2F" "#48373A" "#6C5356" "#552203"
+     "#803303" "#AA4403" "#D45503" "#FF6603" "#002258" "#003383" "#0044AD"
+     "#28170E" "#502D19" "#784424" "#A05A2F" "#C8713A" "#483E3A" "#917C72"
+     "#6C5D56" "#806603" "#AA8803" "#D4AA03" "#112B03" "#225503" "#338003"
+
+     "#000004" "#800004" "#FF0004" "#808004" "#FFFF04" "#008004" "#00FF04"
+     "#008084" "#010003" "#000084" "#000103" "#800084" "#FF0103" "#AA0004"
+     "#280B0F" "#50161A" "#782125" "#A02C30" "#48373B" "#6C5357" "#552204"
+     "#803304" "#AA4404" "#D45504" "#FF6604" "#002259" "#003384" "#0044AE"
+     "#28170F" "#502D1A" "#784425" "#A05A30" "#C8713B" "#483E3B" "#917C73"
+     "#6C5D57" "#806604" "#AA8804" "#D4AA04" "#112B04" "#225504" "#338004"
+
+     "#000005" "#800005" "#FF0005" "#808005" "#FFFF05" "#008005" "#00FF05"
+     "#008085" "#010004" "#000085" "#000104" "#800085" "#FF0104" "#AA0005"
+     "#280B10" "#50161B" "#782126" "#A02C31" "#48373C" "#6C5358" "#552205"
+     "#803305" "#AA4405" "#D45505" "#FF6605" "#00225A" "#003385" "#0044AF"
+     "#281710" "#502D1B" "#784426" "#A05A31" "#C8713C" "#483E3C" "#917C74"
+     "#6C5D58" "#806605" "#AA8805" "#D4AA05" "#112B05" "#225505" "#338005"
+
+     "#000006" "#800006" "#FF0006" "#808006" "#FFFF06" "#008006" "#00FF06"
+     "#008086" "#010005" "#000086" "#000105" "#800086" "#FF0105" "#AA0006"
+     "#280B11" "#50161C" "#782127" "#A02C32" "#48373D" "#6C5359" "#552206"
+     "#803306" "#AA4406" "#D45506" "#FF6606" "#00225B" "#003386" "#0044B0"
+     "#281711" "#502D1C" "#784427" "#A05A32" "#C8713D" "#483E3D" "#917C75"
+     "#6C5D59" "#806606" "#AA8806" "#D4AA06" "#112B06" "#225506" "#338006"
+
+     "#000007" "#800007" "#FF0007" "#808007" "#FFFF07" "#008007" "#00FF07"
+     "#008087" "#010006" "#000087" "#000106" "#800087" "#FF0106" "#AA0007"
+     "#280B12" "#50161D" "#782128" "#A02C33" "#48373E" "#6C535A" "#552207"
+     "#803307" "#AA4407" "#D45507" "#FF6607" "#00225C" "#003387" "#0044B1"
+     "#281712" "#502D1D" "#784428" "#A05A33" "#C8713E" "#483E3E" "#917C76"
+     "#6C5D5A" "#806607" "#AA8807" "#D4AA07" "#112B07" "#225507" "#338007"
+
+     "#000008" "#800008" "#FF0008" "#808008" "#FFFF08" "#008008" "#00FF08"
+     "#008088" "#010007" "#000088" "#000107" "#800088" "#FF0107" "#AA0008"
+     "#280B13" "#50161E" "#782129" "#A02C34" "#48373F" "#6C535B" "#552208"
+     "#803308" "#AA4408" "#D45508" "#FF6608" "#00225D" "#003388" "#0044B2"
+     "#281713" "#502D1E" "#784429" "#A05A34" "#C8713F" "#483E3F" "#917C77"
+     "#6C5D5B" "#806608" "#AA8808" "#D4AA08" "#112B08" "#225508" "#338008"
+
+     "#000009" "#800009" "#FF0009" "#808009" "#FFFF09" "#008009" "#00FF09"
+     "#008089" "#010008" "#000089" "#000108" "#800089" "#FF0108" "#AA0009"
+     "#280B14" "#50161F" "#78212A" "#A02C35" "#483740" "#6C535C" "#552209"
+     "#803309" "#AA4409" "#D45509" "#FF6609" "#00225E" "#003389" "#0044B3"
+     "#281714" "#502D1F" "#78442A" "#A05A35" "#C87140" "#483E40" "#917C78"
+     "#6C5D5C" "#806609" "#AA8809" "#D4AA09" "#112B09" "#225509" "#338009")))
+
+#|
+(remove-duplicates
+ (let ((colors '("#000000" "#800000" "#ff0000" "#808000" "#ffff00" "#008000" "#00ff00"
+                 "#008080" "#00ffff" "#000080" "#0000ff" "#800080" "#ff00ff" "#aa0000"
+                 "#280b0b" "#501616" "#782121" "#a02c2c" "#483737" "#6c5353" "#552200"
+                 "#803300" "#aa4400" "#d45500" "#ff6600" "#002255" "#003380" "#0044aa"
+                 "#28170b" "#502d16" "#784421" "#a05a2c" "#c87137" "#483e37" "#917c6f"
+                 "#6c5d53" "#806600" "#aa8800" "#d4aa00" "#112b00" "#225500" "#338000")))
+   (loop for count below 10
+      append (loop for color in colors collect (format nil "#~6,'0x" (+ count (read-from-string (format nil "#x~a" (subseq color 1))))))
+        ))
+ :test #'string=)
+|#
 
 (defun chan->color (midi-chan &optional (colormap *svg-colormap*))
   "rgb color lookup for the first 16 MIDI channels."
@@ -148,7 +225,7 @@ the elements slot."
         midi-chan))
 
 (defun color->chan (color &optional (colormap *svg-colormap*))
-  (or (and colormap (gethash color colormap)) 0))
+  (or (and colormap (gethash (string-upcase color) colormap)) 0))
 
 (defmethod write-event ((obj midi) (fil svg-file) scoretime)
   "convert a midi object into a freshly allocated svg-line object and
@@ -162,8 +239,8 @@ svg-file."
                      (width (* x-scale (midi-duration obj)))
                      (color (chan->color myid))
                      (opacity (midi-amplitude obj)))
-                 (make-instance 'svg-ie::svg-line :x1 x1 :y1 y1
-                                :x2 (+ x1 width) :y2 y1
+                 (make-instance 'svg-ie::svg-line :x1 (float x1) :y1 (float y1)
+                                :x2 (float (+ x1 width)) :y2 (float y1)
                                 :stroke-width stroke-width
                                 :opacity opacity
                                 :stroke-color color 
@@ -171,14 +248,22 @@ svg-file."
                                 :id (new-id fil 'line-ids)))))
     (svg-file-insert-line line myid fil)))
 
-(defun svg->midi (file layer x-scale &key colormap)
+(defun svg->midi (file layer x-scale &key colormap start end)
+  (let* ((x-offs (if start (* -1 (/ start x-scale)) 0))
+         (ende (if end (+ x-offs (/ end x-scale)) most-positive-fixnum)))
+;;;    (break "x-offs: ~a ende: ~a" x-offs ende)
     (mapcar
-     (lambda (line) (destructuring-bind (time keynum dur color amp) line
-                 (new midi :time (float (* x-scale time)) :keynum keynum :duration (float (* x-scale dur)) :amplitude amp
+     (lambda (line) (let* ((time (getf line :x1))
+                      (keynum (getf line :y1))
+                      (dur (- (getf line :x2) time))
+                      (color (getf line :color))
+                      (amp (getf line :opacity)))
+                    (new midi :time (float (* x-scale time)) :keynum keynum :duration (float (* x-scale dur)) :amplitude amp
                       :channel (color->chan color colormap))))
-     (svg-ie::svg->lines :infile file :layer layer :xquantize nil :yquantize nil)))
+     (remove-if-not (lambda (line) (<= 0 (getf line :x1) ende))
+                    (svg-ie::svg->lines :infile file :layer layer :xquantize nil :yquantize nil :x-offset x-offs)))))
 
-(defmethod import-events ((file svg-file) &key (seq t) layer (x-scale 1) colormap)
+(defmethod import-events ((file svg-file) &key (seq t) layer (x-scale 1) (colormap *svg-colormap*) (start 0) end)
   (let ((fil (file-output-filename file)))
     (cond ((or (not seq) (typep seq <seq>)) nil)
           ((eq seq t)
@@ -190,7 +275,7 @@ svg-file."
                            (if layer (format nil "-~a" layer) "")))))
           (t
            (error "import-events: ~S is not a boolean or seq." seq)))
-    (let ((events (svg->midi fil (or layer "Events") x-scale :colormap colormap)))
+    (let ((events (svg->midi fil (or layer "Events") x-scale :colormap colormap :start start :end end)))
       (if (and seq events)
           (progn (setf (container-subobjects seq) events)
                  seq)

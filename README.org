@@ -62,7 +62,7 @@ When cm-incudine is installed and rts is started the svg file can be
 played in realtime using midi:
 
 #+BEGIN_SRC lisp
-(sprout *myseq* *rts-out*)
+(sprout *myseq*)
 #+END_SRC
 
 **Note:** cm-svg is not a package on its own. It is evaluated within

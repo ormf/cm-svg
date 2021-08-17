@@ -1,7 +1,7 @@
 cm-svg adds a svg backend to cm. It is a seperate package depending on
 [[https://github.com/ormf/svg-import-export][svg-import-export]] and the common lisp version of [[https://github.com/ormf/cm][Common Music]].
 
-# Installation
+* Installation
 
 - download  [[https://github.com/ormf/cm][Common Music]], [[https://github.com/ormf/svg-import-export][svg-import-export]] and  [[https://github.com/ormf/cm-svg][cm-svg]]
 
@@ -23,6 +23,7 @@ with quicklisp:
 #+END_SRC
 
 Example:
+
 #+BEGIN_SRC lisp
   (in-package :cm)
 
@@ -40,6 +41,9 @@ Example:
   ;;; -> "/tmp/test.svg"
 
 #+END_SRC
+
+#+RESULTS:
+: /tmp/test.svg
 
 Importing from svg:
 
@@ -65,5 +69,5 @@ played in realtime using midi:
 (sprout *myseq* *rts-out*)
 #+END_SRC
 
-**Note:** cm-svg is not a package on its own. It is evaluated within
-the :cm package, extending its functionality.
+*Note:* cm-svg is not defined as a package on its own. It is evaluated
+within the :cm package, extending its functionality.

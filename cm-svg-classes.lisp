@@ -20,7 +20,7 @@
      (id-hash :initarg :id-hash :initform (make-hash-table) :accessor svg-file-id-hash) ;;; hashtable for the ids of svg elements
      (view :initarg :view :initform t :accessor svg-file-view)
      (width :initarg :width :initform nil :accessor width)
-     (x-scale :initarg :x-scale :initform 8 :accessor x-scale) ;;; x-scale of events: 1 is a grid-point in the svg
+     (x-scale :initarg :x-scale :initform 32 :accessor x-scale) ;;; x-scale of events: 1 is a grid-point in the svg
      (y-offs :initarg :y-offs :initform 0 :accessor y-offs) ;;; y-offs of events: 1 is a grid-point in the svg
      (piano-roll-vis :initarg :piano-roll-vis :initform t :accessor piano-roll-vis) ;;; visibility flag for piano roll layer
      (staff-system-vis :initarg :staff-system-vis :initform t :accessor staff-system-vis)

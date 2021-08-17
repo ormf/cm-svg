@@ -13,6 +13,27 @@
 
 (in-package :cm)
 
+(defparameter *svg-fn-assoc* nil)
+
+(defun svg-symbol->fn (sym)
+  "retrieve the function object from sym. We can't use
+#'symbol-function as the package of the function is unspecified in the svg."
+  (cdr
+   (assoc sym *svg-fn-assoc*)))
+
+(defun add-svg-assoc-fns (fn-assoc-seq)
+  (mapc (lambda (fn-assoc)
+          (remove-svg-assoc-fn (first fn-assoc))
+          (pushnew fn-assoc *svg-fn-assoc* :test #'equal :key #'first))
+        fn-assoc-seq)
+  *svg-fn-assoc*)
+
+(defun remove-svg-assoc-fn (sym)
+  (setf *svg-fn-assoc* (delete-if (lambda (assoc) (eql assoc sym)) *svg-fn-assoc* :key #'first))
+  *svg-fn-assoc*)
+
+;;; (remove-svg-assoc-fn 'midi)
+
 (defun new-id (svg-file id-type)
   "return a new id of the specified id-type by incrementing a counter
 stored in a hash table with id-type as keys."
@@ -29,6 +50,9 @@ stored in a hash table with id-type as keys."
 (defmethod open-io ((io svg-file) dir &rest args)
   args
   (when (eq dir ':output)
+    (if (event-stream-args io) (warn "non existent keywords for svg-file: ~{:~a~^, ~}
+use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x-scale :barstepsize :startbar :barmultiplier :width"
+                                     (loop for x in (event-stream-args io) by #'cddr collect x)))
     (let ((globs (svg-file-global io)))
       (setf (svg-file-events io) '())
       (if (not (consp globs))
@@ -36,9 +60,6 @@ stored in a hash table with id-type as keys."
                 (if (null globs) (list) (list globs))))
       (setf (io-open io) t)))
   io)
-
-;;; close-io is called, after all events have been collected. This
-;;; method actually writes the file."
 
 (defgeneric endtime (obj))
 
@@ -57,6 +78,9 @@ stored in a hash table with id-type as keys."
 
 (defmethod endtime ((seq list))
   (apply #'max (mapcar #'endtime seq)))
+
+;;; close-io is called after all events have been collected. This
+;;; method actually writes the file."
 
 (defmethod close-io ((io svg-file) &rest mode)
   (let ((err? (and (not (null mode)) (eq (car mode) ':error))))
@@ -222,7 +246,7 @@ the elements slot."
 (defun chan->color (midi-chan &optional (colormap *svg-colormap*))
   "rgb color lookup for the first 16 MIDI channels."
   (aref (gethash :vector colormap)
-        midi-chan))
+        (mod midi-chan (length (gethash :vector colormap)))))
 
 (defun color->chan (color &optional (colormap *svg-colormap*))
   (or (and colormap (gethash (string-upcase color) colormap)) 0))
@@ -248,22 +272,54 @@ svg-file."
                                 :id (new-id fil 'line-ids)))))
     (svg-file-insert-line line myid fil)))
 
-(defun svg->midi (file layer x-scale &key colormap start end)
+(defun recreate-from-attributes (args)
+  "recreate a cm object according to the :attributes property of the
+svg element."
+  (apply (svg-symbol->fn (getf args :type)) (progn (remf args :type) args)))
+
+(defun svg->midi (&rest args)
+  (apply #'make-instance 'midi
+         (ou:get-props-list args '(:time :keynum :duration :amp :channel))))
+
+(add-svg-assoc-fns `((midi . ,(symbol-function 'svg->midi))))
+
+#|
+(defun get-props-list (attributes &rest props)
+  (reduce (lambda (seq prop) (let ((val (getf attributes prop :not-supplied)))
+                          (if (eql val :not-supplied)
+                              seq
+                              (list* prop val seq))))
+          (reverse props)
+          :initial-value nil))
+
+;;; (get-props-list '(:amp 2 :dur 4 :time 12 :keynum 30 :hallo nil) :amp :dur :hallo)
+|#
+
+(defun keynum->pitch (args)
+  "prevent shadowing of :keynum in args by renaming it to :pitch"
+  (setf (getf args :pitch) (getf args :keynum))
+  (remf args :keynum)
+  args)
+
+(defun svg->cm (file layer x-scale &key colormap start end)
   (let* ((x-offs (if start (* -1 (/ start x-scale)) 0))
          (ende (if end (+ x-offs (/ end x-scale)) most-positive-fixnum)))
 ;;;    (break "x-offs: ~a ende: ~a" x-offs ende)
     (mapcar
-     (lambda (line) (let* ((time (getf line :x1))
-                      (keynum (getf line :y1))
-                      (dur (- (getf line :x2) time))
-                      (color (getf line :color))
-                      (amp (getf line :opacity)))
-                    (new midi :time (float (* x-scale time)) :keynum keynum :duration (float (* x-scale dur)) :amplitude amp
-                      :channel (color->chan color colormap))))
+     (lambda (line)
+       (ou:with-props (x1 y1 x2 color opacity attributes) line
+         (when (not attributes) (setf (getf attributes :type) 'midi))
+         (recreate-from-attributes (list* :time (float (* x-scale x1))
+                                          :keynum y1
+                                          :duration (float (* x-scale (- x2 x1)))
+                                          :amplitude opacity
+                                          :channel (color->chan color colormap)
+                                          (keynum->pitch attributes)))))
      (remove-if-not (lambda (line) (<= 0 (getf line :x1) ende))
                     (svg-ie::svg->lines :infile file :layer layer :xquantize nil :yquantize nil :x-offset x-offs)))))
 
-(defmethod import-events ((file svg-file) &key (seq t) layer (x-scale 1) (colormap *svg-colormap*) (start 0) end)
+
+(defmethod import-events ((file svg-file) &key (seq t) layer (x-scale 1/32) (colormap *svg-colormap*) (start 0) end)
   (let ((fil (file-output-filename file)))
     (cond ((or (not seq) (typep seq <seq>)) nil)
           ((eq seq t)
@@ -275,12 +331,13 @@ svg-file."
                            (if layer (format nil "-~a" layer) "")))))
           (t
            (error "import-events: ~S is not a boolean or seq." seq)))
-    (let ((events (svg->midi fil (or layer "Events") x-scale :colormap colormap :start start :end end)))
+    (let ((events (svg->cm fil (or layer "Events") x-scale :colormap colormap :start start :end end)))
       (if (and seq events)
           (progn (setf (container-subobjects seq) events)
                  seq)
           events))))
 
-(export '*SVG-COLORMAP* 'cm)
-(export 'color->chan 'cm)
-(export 'chan->color 'cm)
+
+
+
+(export '(*SVG-COLORMAP* COLOR->CHAN CHAN->COLOR ADD-RECREATION-FN) 'cm)

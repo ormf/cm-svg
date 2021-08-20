@@ -295,9 +295,9 @@ svg element."
 ;;; (get-props-list '(:amp 2 :dur 4 :time 12 :keynum 30 :hallo nil) :amp :dur :hallo)
 |#
 
-(defun keynum->pitch (args)
-  "prevent shadowing of :keynum in args by renaming it to :pitch"
-  (setf (getf args :pitch) (getf args :keynum))
+(defun keynum->saved-keynum (args)
+  "prevent shadowing of :keynum in args by renaming it to :saved-keynum"
+  (setf (getf args :saved-keynum) (getf args :keynum))
   (remf args :keynum)
   args)
 
@@ -314,7 +314,7 @@ svg element."
                                           :duration (float (* x-scale (- x2 x1)))
                                           :amplitude opacity
                                           :channel (color->chan color colormap)
-                                          (keynum->pitch attributes)))))
+                                          (keynum->saved-keynum attributes)))))
      (remove-if-not (lambda (line) (<= 0 (getf line :x1) ende))
                     (svg-ie::svg->lines :infile file :layer layer :xquantize nil :yquantize nil :x-offset x-offs)))))
 

@@ -301,25 +301,98 @@ svg element."
   (remf args :keynum)
   args)
 
+(defun opacity->db (opacity)
+  (- (* opacity 60) 60))
+
+(defun db->opacity (db)
+  (max (min 1.0 (+ (/ db 60) 1)) 0.0))
+
+#|
+(defun svg->cm (file layer x-scale &key colormap start end group? layer?)
+  (let* ((x-offs (if start (* -1 (/ start x-scale)) 0))
+         (ende (if end (+ x-offs (/ end x-scale)) most-positive-fixnum)))
+;;;    (break "x-offs: ~a ende: ~a" x-offs ende)
+    (labels ((inner (elems)
+;;;               (break "inner: ~a" elems)
+               (cond
+                 ((null elems) '())
+                 ((consp (first elems))
+                  (cons (inner (first elems)) (inner (rest elems))))
+                 ((typep (first elems) 'svg-ie:svg-cm-line)
+                  (with-slots (svg-ie::x1 svg-ie::y1 svg-ie::x2 svg-ie::color svg-ie::opacity svg-ie::attributes)
+                      (first elems)
+                    (if (and ende (<= (* x-scale svg-ie::x1) ende))
+                        (cons (progn
+                                (when (not svg-ie::attributes) (setf (getf svg-ie::attributes :type) 'midi))
+                                (recreate-from-attributes (list* :time (float (* x-scale svg-ie::x1))
+                                                                 :keynum svg-ie::y1
+                                                                 :duration (float (* x-scale (- svg-ie::x2 svg-ie::x1)))
+                                                                 :amplitude svg-ie::opacity
+                                                                 :channel (color->chan svg-ie::color colormap)
+                                                                 (keynum->saved-keynum svg-ie::attributes))))
+                              (inner (rest elems)))
+                        (inner (rest elems)))))
+                 (:else (cons (first elems) (inner (rest elems)))))))
+      (let ((lines (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil :x-offset x-offs
+                                      :group? group? :layer? layer?)))
+        (inner lines)))))
+|#
+
+(defun svg->cm (file layer x-scale &key colormap start end group? layer?)
+  (let* ((x-offs (if start (* -1 (/ start x-scale)) 0))
+         (ende (if end (+ x-offs (/ end x-scale)) most-positive-fixnum)))
+;;;    (break "x-offs: ~a ende: ~a" x-offs ende)
+    (labels ((inner (elems result)
+;;;               (break "inner: ~a" elems)
+               (cond
+                 ((null elems) (reverse result))
+                 ((consp (first elems))
+                  (push (inner (first elems) '()) result)
+                  (inner (rest elems) result))
+                 ((typep (first elems) 'svg-ie:svg-cm-line)
+                  (with-slots (svg-ie::x1 svg-ie::y1 svg-ie::x2 svg-ie::color svg-ie::opacity svg-ie::attributes)
+                      (first elems)
+                    (if (and ende (<= (* x-scale svg-ie::x1) ende))
+                        (push (progn
+                                (when (not svg-ie::attributes) (setf (getf svg-ie::attributes :type) 'midi))
+                                (recreate-from-attributes (list* :time (float (* x-scale svg-ie::x1))
+                                                                 :keynum svg-ie::y1
+                                                                 :duration (float (* x-scale (- svg-ie::x2 svg-ie::x1)))
+                                                                 :amplitude svg-ie::opacity
+                                                                 :channel (color->chan svg-ie::color colormap)
+                                                                 (keynum->saved-keynum svg-ie::attributes))))
+                              result))
+                    (inner (rest elems) result)))
+                 (:else (inner (rest elems) (push (first elems) result))))))
+      (let ((lines (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil :x-offset x-offs
+                                      :group? group? :layer? layer?)))
+        (inner lines '())))))
+
+#|
+
 (defun svg->cm (file layer x-scale &key colormap start end)
   (let* ((x-offs (if start (* -1 (/ start x-scale)) 0))
          (ende (if end (+ x-offs (/ end x-scale)) most-positive-fixnum)))
 ;;;    (break "x-offs: ~a ende: ~a" x-offs ende)
     (mapcar
      (lambda (line)
-       (ou:with-props (x1 y1 x2 color opacity attributes) line
-         (when (not attributes) (setf (getf attributes :type) 'midi))
-         (recreate-from-attributes (list* :time (float (* x-scale x1))
-                                          :keynum y1
-                                          :duration (float (* x-scale (- x2 x1)))
-                                          :amplitude opacity
-                                          :channel (color->chan color colormap)
-                                          (keynum->saved-keynum attributes)))))
-     (remove-if-not (lambda (line) (<= 0 (getf line :x1) ende))
-                    (svg-ie::svg->lines :infile file :layer layer :xquantize nil :yquantize nil :x-offset x-offs)))))
+       (with-slots (svg-ie::x1 svg-ie::y1 svg-ie::x2 svg-ie::color svg-ie::opacity svg-ie::attributes) line
+           (when (not svg-ie::attributes) (setf (getf svg-ie::attributes :type) 'midi))
+         (recreate-from-attributes (list* :time (float (* x-scale svg-ie::x1))
+                                                                 :keynum svg-ie::y1
+                                                                 :duration (float (* x-scale (- svg-ie::x2 svg-ie::x1)))
+                                                                 :amplitude svg-ie::opacity
+                                                                 :channel (color->chan svg-ie::color colormap)
+                                                                 (keynum->saved-keynum svg-ie::attributes)))))
+
+     (remove-if-not (lambda (line) (<= 0 (slot-value line 'svg-ie::x1) ende))
+                    (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil :x-offset x-offs
+                                       :group? nil :layer? nil)))))
+
+|#
 
 
-(defmethod import-events ((file svg-file) &key (seq t) layer (x-scale 1/32) (colormap *svg-colormap*) (start 0) end)
+(defmethod import-events ((file svg-file) &key (seq t) layer (x-scale 1/32) (colormap *svg-colormap*) (start 0) end group? layer?)
   (let ((fil (file-output-filename file)))
     (cond ((or (not seq) (typep seq <seq>)) nil)
           ((eq seq t)
@@ -331,7 +404,7 @@ svg element."
                            (if layer (format nil "-~a" layer) "")))))
           (t
            (error "import-events: ~S is not a boolean or seq." seq)))
-    (let ((events (svg->cm fil (or layer "Events") x-scale :colormap colormap :start start :end end)))
+    (let ((events (svg->cm fil (or layer "Events") x-scale :colormap colormap :start start :end end :group? group? :layer? layer?)))
       (if (and seq events)
           (progn (setf (container-subobjects seq) events)
                  seq)
@@ -340,4 +413,4 @@ svg element."
 
 
 
-(export '(*SVG-COLORMAP* COLOR->CHAN CHAN->COLOR ADD-RECREATION-FN) 'cm)
+(export '(SVG->CM *SVG-COLORMAP* COLOR->CHAN CHAN->COLOR ADD-RECREATION-FN OPACITY->DB DB->OPACITY) 'cm)

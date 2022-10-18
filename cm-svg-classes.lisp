@@ -28,7 +28,9 @@
      (barstepsize :initarg :barstepsize :initform 1 :accessor barstepsize)
      (startbar :initarg :startbar :initform 1 :accessor startbar)
      (barmultiplier :initarg :barmultiplier :initform 4 :accessor barmultiplier)
-     (showgrid :initarg :showgrid :initform t :accessor showgrid)) ;;; visibility flag for grid
+     (timesigs :initarg :timesigs :initform nil :accessor timesigs)
+     (showgrid :initarg :showgrid :initform t :accessor showgrid) ;;; visibility flag for grid
+     (gridtype :initarg :gridtype :initform "4x4" :accessor gridtype))
     #+metaclasses
     (:metaclass io-class))
   (defparameter <svg-file> (find-class 'svg-file))

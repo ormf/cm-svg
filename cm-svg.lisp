@@ -32,7 +32,7 @@
   (setf *svg-fn-assoc* (delete-if (lambda (assoc) (eql assoc sym)) *svg-fn-assoc* :key #'first))
   *svg-fn-assoc*)
 
-;;; (remove-svg-assoc-fn 'midi)
+;;; (remove-svg-assoc-fn 'pmidi)
 
 (defun new-id (svg-file id-type)
   "return a new id of the specified id-type by incrementing a counter
@@ -94,10 +94,12 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
        :staff-system-vis (staff-system-vis io)
        :bar-lines-vis (bar-lines-vis io)
        :showgrid (showgrid io)
+       :gridtype (gridtype io)
        :x-scale (x-scale io)
        :barstepsize (barstepsize io)
        :startbar (startbar io)
        :barmultiplier (barmultiplier io)
+       :timesigs (timesigs io)
        :width (or (width io) (endtime (svg-file-events io)))))))
 
 ;;; cm-svg-export initializes a svg-ie:svg-file instance, fills
@@ -114,7 +116,7 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
 ;;; channel number before calling svg-ie:export-svg-file.
 
 (defun cm-svg-export (&key events global (staff-system-vis t) (piano-roll-vis t) (fname "/tmp/test.svg")
-                        (showgrid t) (width 10000) (x-scale 8) (bar-lines-vis t) (barstepsize 4) (startbar 1) (barmultiplier 1)
+                        (showgrid t) (gridtype "4x4") (width 10000) (x-scale 8) (bar-lines-vis t) (barstepsize 4) (startbar 1) (barmultiplier 1) timesigs
                         &allow-other-keys)
   (declare (ignore global))
   (let ((svg-file (make-instance 'svg-ie:svg-file)))
@@ -123,11 +125,11 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
            (list (svg-ie:svg-staff-system svg-file :visible staff-system-vis :width width))
            (list (svg-ie:svg-piano-roll svg-file :visible piano-roll-vis :width width))
            (list (svg-ie:svg-barlines svg-file :visible bar-lines-vis :width width :x-scale x-scale
-                                      :barstepsize barstepsize :startbar startbar :barmultiplier barmultiplier))
+                                      :barstepsize barstepsize :startbar startbar :barmultiplier barmultiplier :timesigs timesigs))
            (list (cons (make-instance 'svg-ie::svg-tl-layer :name "Events" :id "ebenen-id")
                        (sort (mapcar (lambda (chan) (cons (first chan) (reverse (rest chan)))) events)
                              #'string> :key (lambda (x) (slot-value (car x) 'svg-ie::name)))))))
-    (svg-ie:export-svg-file svg-file :fname fname :showgrid showgrid :width width)))
+    (svg-ie:export-svg-file svg-file :fname fname :showgrid showgrid :gridtype gridtype :width width)))
 
 (defun chan-eq? (chan layer-obj)
   "check if chan matches the ch<chan> in the name (label) of the
@@ -169,11 +171,11 @@ the elements slot."
      "#000001" "#800001" "#FF0001" "#808001" "#FFFF01" "#008001" "#00FF01"
      "#008081" "#010000" "#000081" "#000100" "#800081" "#FF0100" "#AA0001"
      "#280B0C" "#501617" "#782122" "#A02C2D" "#483738" "#6C5354" "#552201"
-     "#803301" "#AA4401" "#D45501" "#FF6601" "#002256" "#003381" "#0044AB"
+     "#f07301" "#AA4401" "#D45501" "#FF6601" "#002256" "#003381" "#0044AB"
      "#28170C" "#502D17" "#784422" "#A05A2D" "#C87138" "#483E38" "#917C70"
      "#6C5D54" "#806601" "#AA8801" "#D4AA01" "#112B01" "#225501" "#338001"
 
-     "#000002" "#800002" "#FF0002" "#808002" "#FFFF02" "#008002" "#00FF02"
+     "#0000F9" "#800002" "#FF0002" "#808002" "#FFFF02" "#008002" "#00FF02"
      "#008082" "#010001" "#000082" "#000101" "#800082" "#FF0101" "#AA0002"
      "#280B0D" "#501618" "#782123" "#A02C2E" "#483739" "#6C5355" "#552202"
      "#803302" "#AA4402" "#D45502" "#FF6602" "#002257" "#003382" "#0044AC"
@@ -181,7 +183,7 @@ the elements slot."
      "#6C5D55" "#806602" "#AA8802" "#D4AA02" "#112B02" "#225502" "#338002"
 
      "#000003" "#800003" "#FF0003" "#808003" "#FFFF03" "#008003" "#00FF03"
-     "#008083" "#010002" "#000083" "#000102" "#800083" "#FF0102" "#AA0003"
+     "#008083" "#010002" "#000102" "#f00083" "#800083" "#FF0102" "#AA0003"
      "#280B0E" "#501619" "#782124" "#A02C2F" "#48373A" "#6C5356" "#552203"
      "#803303" "#AA4403" "#D45503" "#FF6603" "#002258" "#003383" "#0044AD"
      "#28170E" "#502D19" "#784424" "#A05A2F" "#C8713A" "#483E3A" "#917C72"
@@ -217,12 +219,12 @@ the elements slot."
 
      "#000008" "#800008" "#FF0008" "#808008" "#FFFF08" "#008008" "#00FF08"
      "#008088" "#010007" "#000088" "#000107" "#800088" "#FF0107" "#AA0008"
-     "#280B13" "#50161E" "#782129" "#A02C34" "#48373F" "#6C535B" "#552208"
+     "#280B13" "#D3867E" "#782129" "#A02C34" "#48373F" "#6C535B" "#552208"
      "#803308" "#AA4408" "#D45508" "#FF6608" "#00225D" "#003388" "#0044B2"
      "#281713" "#502D1E" "#784429" "#A05A34" "#C8713F" "#483E3F" "#917C77"
      "#6C5D5B" "#806608" "#AA8808" "#D4AA08" "#112B08" "#225508" "#338008"
 
-     "#000009" "#800009" "#FF0009" "#808009" "#FFFF09" "#008009" "#00FF09"
+     "#00f002" "#800009" "#FF0009" "#808009" "#FFFF09" "#008009" "#00FF09"
      "#008089" "#010008" "#000089" "#000108" "#800089" "#FF0108" "#AA0009"
      "#280B14" "#50161F" "#78212A" "#A02C35" "#483740" "#6C535C" "#552209"
      "#803309" "#AA4409" "#D45509" "#FF6609" "#00225E" "#003389" "#0044B3"
@@ -297,15 +299,16 @@ svg element."
 
 (defun keynum->saved-keynum (args)
   "prevent shadowing of :keynum in args by renaming it to :saved-keynum"
-  (setf (getf args :saved-keynum) (getf args :keynum))
-  (remf args :keynum)
+  (when (getf args :keynum)
+    (setf (getf args :saved-keynum) (getf args :keynum))
+    (remf args :keynum))
   args)
 
 (defun opacity->db (opacity)
   (- (* opacity 60) 60))
 
 (defun db->opacity (db)
-  (max (min 1.0 (+ (/ db 60) 1)) 0.0))
+  (float (max (min 1.0 (+ (/ db 60) 1)) 0.0) 1.0))
 
 #|
 (defun svg->cm (file layer x-scale &key colormap start end group? layer?)
@@ -338,9 +341,9 @@ svg element."
         (inner lines)))))
 |#
 
-(defun svg->cm (file layer x-scale &key colormap start end group? layer?)
-  (let* ((x-offs (if start (* -1 (/ start x-scale)) 0))
-         (ende (if end (+ x-offs (/ end x-scale)) most-positive-fixnum)))
+(defun svg->cm (file layer x-scale &key (x-offset 0) colormap start end group? layer?)
+  (let* ((start-offs (if start (* -1 (/ start x-scale)) 0))
+         (ende (if end (+ start-offs (/ end x-scale)) most-positive-fixnum)))
 ;;;    (break "x-offs: ~a ende: ~a" x-offs ende)
     (labels ((inner (elems result)
 ;;;               (break "inner: ~a" elems)
@@ -353,18 +356,20 @@ svg element."
                   (with-slots (svg-ie::x1 svg-ie::y1 svg-ie::x2 svg-ie::color svg-ie::opacity svg-ie::attributes)
                       (first elems)
                     (if (and ende (<= (* x-scale svg-ie::x1) ende))
-                        (push (progn
-                                (when (not svg-ie::attributes) (setf (getf svg-ie::attributes :type) 'midi))
-                                (recreate-from-attributes (list* :time (float (* x-scale svg-ie::x1))
-                                                                 :keynum svg-ie::y1
-                                                                 :duration (float (* x-scale (- svg-ie::x2 svg-ie::x1)))
-                                                                 :amplitude svg-ie::opacity
-                                                                 :channel (color->chan svg-ie::color colormap)
-                                                                 (keynum->saved-keynum svg-ie::attributes))))
-                              result))
+                        (progn
+                          (when (not svg-ie::attributes) (setf (getf svg-ie::attributes :type) 'midi))
+                          (if (svg-symbol->fn (getf svg-ie::attributes :type))
+                              (push (recreate-from-attributes (list* :time (float (+ x-offset (* x-scale svg-ie::x1)))
+                                                                     :keynum svg-ie::y1
+                                                                     :duration (float (max 0.001 (* x-scale (- svg-ie::x2 svg-ie::x1))))
+                                                                     :amplitude svg-ie::opacity
+                                                                     :channel (color->chan svg-ie::color colormap)
+                                                                     (keynum->saved-keynum svg-ie::attributes)))
+                                    result)
+                              (if *debug* (warn "can't import type ~a" (getf svg-ie::attributes :type))))))
                     (inner (rest elems) result)))
                  (:else (inner (rest elems) (push (first elems) result))))))
-      (let ((lines (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil :x-offset x-offs
+      (let ((lines (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil
                                       :group? group? :layer? layer?)))
         (inner lines '())))))
 
@@ -392,7 +397,10 @@ svg element."
 |#
 
 
-(defmethod import-events ((file svg-file) &key (seq t) layer (x-scale 1/32) (colormap *svg-colormap*) (start 0) end group? layer?)
+(defmethod import-events ((file svg-file) &key (x-offset 0)
+                                            (seq t) layer (x-scale 1/32)
+                                            (colormap *svg-colormap*) (start 0)
+                                            end group? layer?)
   (let ((fil (file-output-filename file)))
     (cond ((or (not seq) (typep seq <seq>)) nil)
           ((eq seq t)
@@ -404,7 +412,8 @@ svg element."
                            (if layer (format nil "-~a" layer) "")))))
           (t
            (error "import-events: ~S is not a boolean or seq." seq)))
-    (let ((events (svg->cm fil (or layer "Events") x-scale :colormap colormap :start start :end end :group? group? :layer? layer?)))
+    (let ((events (svg->cm fil (or layer "Events") x-scale :x-offset x-offset
+                           :colormap colormap :start start :end end :group? group? :layer? layer?)))
       (if (and seq events)
           (progn (setf (container-subobjects seq) events)
                  seq)

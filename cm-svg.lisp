@@ -366,7 +366,7 @@ svg element."
                                                                      :channel (color->chan svg-ie::color colormap)
                                                                      (keynum->saved-keynum svg-ie::attributes)))
                                     result)
-                              (if *debug* (warn "can't import type ~a" (getf svg-ie::attributes :type))))))
+                              (warn "can't import type ~a" (getf svg-ie::attributes :type)))))
                     (inner (rest elems) result)))
                  (:else (inner (rest elems) (push (first elems) result))))))
       (let ((lines (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil

@@ -15,4 +15,5 @@
                #:cm)
   :serial t
   :components ((:file "cm-svg-classes")
+               (:file "svg-ie-add-ons")
                (:file "cm-svg")))

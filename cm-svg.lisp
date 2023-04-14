@@ -15,6 +15,14 @@
 
 (defparameter *svg-fn-assoc* nil)
 
+;;; xml is picky with quotes in attributes, therefore we keep a list
+;;; of properties in an attribute of an svg element which should get
+;;; quoted on import to preserve case on reading with the lisp
+;;; reader. The property needs to be registered with
+;;; #'add-svg-attribute-prop-to quote
+
+
+
 (defun svg-symbol->fn (sym)
   "retrieve the function object from sym. We can't use
 #'symbol-function as the package of the function is unspecified in the svg."
@@ -341,39 +349,46 @@ svg element."
         (inner lines)))))
 |#
 
+(defun svg-lines->cm (svg-lines &key (x-offset 0) (x-scale 1) end colormap)
+  (labels ((inner (elems result)
+                  (cond
+                    ((null elems) (reverse result))
+                    ((consp (first elems))
+                     (push (inner (first elems) '()) result)
+                     (inner (rest elems) result))
+                    ((typep (first elems) 'svg-ie:svg-cm-line)
+                     (with-slots (svg-ie::x1 svg-ie::y1 svg-ie::x2 svg-ie::color svg-ie::opacity svg-ie::attributes)
+                         (first elems)
+                       (if (or (not end) (<= (* x-scale svg-ie::x1) end))
+                           (progn
+                             (when (not svg-ie::attributes) (setf (getf svg-ie::attributes :type) 'midi))
+                             (if (svg-symbol->fn (getf svg-ie::attributes :type))
+                                 (push (recreate-from-attributes (list* :time (float (+ x-offset (* x-scale svg-ie::x1)))
+                                                                        :keynum svg-ie::y1
+                                                                        :duration (float (max 0.001 (* x-scale (- svg-ie::x2 svg-ie::x1))))
+                                                                        :amplitude svg-ie::opacity
+                                                                        :channel (color->chan svg-ie::color colormap)
+                                                                        (keynum->saved-keynum svg-ie::attributes)))
+                                       result)
+                                 (warn "can't import type ~a" (getf svg-ie::attributes :type)))))
+                       (inner (rest elems) result)))
+                    (:else (inner (rest elems) (push (first elems) result))))))
+    (inner svg-lines '())))
+
+
 (defun svg->cm (file layer x-scale &key (x-offset 0) colormap start end group? layer?)
   (let* ((start-offs (if start (* -1 (/ start x-scale)) 0))
          (ende (if end (+ start-offs (/ end x-scale)) most-positive-fixnum)))
 ;;;    (break "x-offs: ~a ende: ~a" x-offs ende)
-    (labels ((inner (elems result)
-;;;               (break "inner: ~a" elems)
-               (cond
-                 ((null elems) (reverse result))
-                 ((consp (first elems))
-                  (push (inner (first elems) '()) result)
-                  (inner (rest elems) result))
-                 ((typep (first elems) 'svg-ie:svg-cm-line)
-                  (with-slots (svg-ie::x1 svg-ie::y1 svg-ie::x2 svg-ie::color svg-ie::opacity svg-ie::attributes)
-                      (first elems)
-                    (if (and ende (<= (* x-scale svg-ie::x1) ende))
-                        (progn
-                          (when (not svg-ie::attributes) (setf (getf svg-ie::attributes :type) 'midi))
-                          (if (svg-symbol->fn (getf svg-ie::attributes :type))
-                              (push (recreate-from-attributes (list* :time (float (+ x-offset (* x-scale svg-ie::x1)))
-                                                                     :keynum svg-ie::y1
-                                                                     :duration (float (max 0.001 (* x-scale (- svg-ie::x2 svg-ie::x1))))
-                                                                     :amplitude svg-ie::opacity
-                                                                     :channel (color->chan svg-ie::color colormap)
-                                                                     (keynum->saved-keynum svg-ie::attributes)))
-                                    result)
-                              (warn "can't import type ~a" (getf svg-ie::attributes :type)))))
-                    (inner (rest elems) result)))
-                 (:else (inner (rest elems) (push (first elems) result))))))
-      (let ((lines (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil
-                                      :group? group? :layer? layer?)))
-        (inner lines '())))))
+    (svg-lines->cm (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil
+                                      :group? group? :layer? layer?)
+                   :x-scale x-scale :x-offset x-offset :colormap colormap :end ende)))
+
+(defparameter *inkscape-export* (new seq :name "inkscape-export"))
 
 #|
+
+(svg-symbol->fn 'poolevt)
 
 (defun svg->cm (file layer x-scale &key colormap start end)
   (let* ((x-offs (if start (* -1 (/ start x-scale)) 0))
@@ -419,7 +434,15 @@ svg element."
                  seq)
           events))))
 
+(defun inkscape-export->cm (svg-evts)
+  "convert svg elems exported by the inkscape 'Play Selection' extension
+to sproutable cm-events."
+  (let* ((evts (sort (mapcar #'svg-ie:make-cm-line svg-evts) #'< :key (lambda (x) (slot-value x 'svg-ie:x1))))
+         (x-scale 1/32)
+         (x-offs (* -1 x-scale (slot-value (first evts) 'svg-ie::x1))))    
+    (svg-lines->cm evts :x-offset x-offs :x-scale x-scale)))
 
 
-
-(export '(SVG->CM *SVG-COLORMAP* COLOR->CHAN CHAN->COLOR ADD-RECREATION-FN OPACITY->DB DB->OPACITY) 'cm)
+(export '(SVG->CM *SVG-COLORMAP* COLOR->CHAN CHAN->COLOR ADD-RECREATION-FN OPACITY->DB DB->OPACITY SVG-LINES->CM
+          INKSCAPE-EXPORT->CM)
+        'cm)

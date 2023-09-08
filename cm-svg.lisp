@@ -110,7 +110,19 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
        :startbar (startbar io)
        :barmultiplier (barmultiplier io)
        :timesigs (timesigs io)
-       :width (or (width io) (endtime (svg-file-events io)))))))
+       :width (or (width io) (endtime (svg-file-events io)))
+       :expand (expand io)))))
+
+(defgeneric add-expansion (evt svg hash))
+
+(defmethod add-expansion ((evt t) svg hash)
+  (declare (ignore evt hash))
+  nil)
+
+(defun add-expansions (evts svg)
+  (let ((hash (make-hash-table :test #'equal)))
+    (apply #'append (mapcar (lambda (evt) (add-expansion evt svg hash))
+                            evts))))
 
 ;;; cm-svg-export initializes a svg-ie:svg-file instance, fills its
 ;;; elements slot with the svg-objects of staff-system, piano-roll,
@@ -127,16 +139,20 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
 
 (defun cm-svg-export (&key events global (staff-system-vis t) (piano-roll-vis t) (fname "/tmp/test.svg") (inverse nil)
                         (showgrid t) (gridtype "4x4") (width 10000) (x-scale 8) (bar-lines-vis t) (barstepsize 4) (startbar 1) (barmultiplier 1) timesigs
+                        (expand t)
                         &allow-other-keys)
   (declare (ignore global))
-;;;  (break "events: ~a" events)
+  (break "events: ~a" events)
   (let ((svg-file (make-instance 'svg-ie:svg-file)))
     (setf (svg-ie::elements svg-file)
           (append
            (list (svg-ie:svg-staff-system svg-file :visible staff-system-vis :width width))
            (list (svg-ie:svg-piano-roll svg-file :visible piano-roll-vis :width width))
            (list (svg-ie:svg-barlines svg-file :visible bar-lines-vis :width width :x-scale x-scale
-                                      :barstepsize barstepsize :startbar startbar :barmultiplier barmultiplier :timesigs timesigs))
+                                               :barstepsize barstepsize :startbar startbar :barmultiplier barmultiplier :timesigs timesigs))
+           (unless expand (list (append (list (make-instance 'svg-ie::svg-layer :name "Expansions" :id (svg-ie::new-id svg-file 'layer-ids) :insensitive t
+                                                                                :visible nil))
+                                        (add-expansions events svg-file))))
            (list (cons (make-instance 'svg-ie::svg-tl-layer :name "Events" :id "ebenen-id")
                        (sort (mapcar (lambda (chan) (cons (first chan) (reverse (rest chan)))) events)
                              #'string> :key (lambda (x) (slot-value (car x) 'svg-ie::name)))))))

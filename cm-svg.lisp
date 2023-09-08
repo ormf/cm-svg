@@ -58,9 +58,10 @@ stored in a hash table with id-type as keys."
 (defmethod open-io ((io svg-file) dir &rest args)
   args
   (when (eq dir ':output)
-    (if (event-stream-args io) (warn "non existent keywords for svg-file: ~{:~a~^, ~}
+    (if (event-stream-args io)
+        (warn "non existent keywords for svg-file: ~{:~a~^, ~}
 use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x-scale :barstepsize :startbar :barmultiplier :width"
-                                     (loop for x in (event-stream-args io) by #'cddr collect x)))
+              (loop for x in (event-stream-args io) by #'cddr collect x)))
     (let ((globs (svg-file-global io)))
       (setf (svg-file-events io) '())
       (if (not (consp globs))
@@ -97,6 +98,7 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
       (cm-svg-export
        :fname (sv io :name)
        :events (svg-file-events io)
+       :inverse (svg-file-inverse io)
        :global (svg-file-global io)
        :piano-roll-vis (piano-roll-vis io)
        :staff-system-vis (staff-system-vis io)
@@ -110,23 +112,24 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
        :timesigs (timesigs io)
        :width (or (width io) (endtime (svg-file-events io)))))))
 
-;;; cm-svg-export initializes a svg-ie:svg-file instance, fills
-;;; its elements slot with the svg-objects of staff-system,
-;;; piano-roll, and the collected events. The events have been
-;;; collected by the #'write-event method into the events slot of the
-;;; svg-file object defined below. write-event collects the events
-;;; into a list with one sublist for each midi-channel. The sublists
-;;; contain a svg-ie:layer object as the first element and
-;;; svg-ie:line objects for each MIDI event in that channel. As
-;;; write-event pushes the line objects into the cdr of the list
-;;; (after the layer object), the cdrs of the channel lists are
-;;; reversed and the list with all layer channels gets sorted by MIDI
-;;; channel number before calling svg-ie:export-svg-file.
+;;; cm-svg-export initializes a svg-ie:svg-file instance, fills its
+;;; elements slot with the svg-objects of staff-system, piano-roll,
+;;; and the collected events. The events have been collected by the
+;;; #'write-event method into the elements slot of the svg-file object
+;;; defined below. write-event collects the events into a list with
+;;; one sublist for each midi-channel. The sublists contain a
+;;; svg-ie:layer object as the first element and svg-ie:line objects
+;;; for each MIDI event in that channel. As write-event pushes the
+;;; line objects into the cdr of the list (after the layer object),
+;;; the cdrs of the channel lists are reversed and the list with all
+;;; layer channels gets sorted by MIDI channel number before calling
+;;; svg-ie:export-svg-file.
 
-(defun cm-svg-export (&key events global (staff-system-vis t) (piano-roll-vis t) (fname "/tmp/test.svg")
+(defun cm-svg-export (&key events global (staff-system-vis t) (piano-roll-vis t) (fname "/tmp/test.svg") (inverse nil)
                         (showgrid t) (gridtype "4x4") (width 10000) (x-scale 8) (bar-lines-vis t) (barstepsize 4) (startbar 1) (barmultiplier 1) timesigs
                         &allow-other-keys)
   (declare (ignore global))
+;;;  (break "events: ~a" events)
   (let ((svg-file (make-instance 'svg-ie:svg-file)))
     (setf (svg-ie::elements svg-file)
           (append
@@ -137,7 +140,7 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
            (list (cons (make-instance 'svg-ie::svg-tl-layer :name "Events" :id "ebenen-id")
                        (sort (mapcar (lambda (chan) (cons (first chan) (reverse (rest chan)))) events)
                              #'string> :key (lambda (x) (slot-value (car x) 'svg-ie::name)))))))
-    (svg-ie:export-svg-file svg-file :fname fname :showgrid showgrid :gridtype gridtype :width width)))
+    (svg-ie:export-svg-file svg-file :fname fname :showgrid showgrid :gridtype gridtype :width width :inverse inverse)))
 
 (defun chan-eq? (chan layer-obj)
   "check if chan matches the ch<chan> in the name (label) of the
@@ -434,11 +437,23 @@ svg element."
                  seq)
           events))))
 
-(defun inkscape-export->cm (svg-evts)
+(defun sanitize-x-coords (svg-evts)
+  (mapcar (lambda (evt)
+            (if (> (getf evt :x1) (getf evt :x2))
+                (let ((tmpx (getf evt :x1)) (tmpy (getf evt :y1)))
+                  (setf (getf evt :x1) (getf evt :x2)
+                        (getf evt :x2) tmpx
+                        (getf evt :y1) (getf evt :y2)
+                        (getf evt :y2) tmpy)))
+            evt)
+          svg-evts))
+
+(defparameter *svg-x-scale* 1/32)
+
+(defun inkscape-export->cm (svg-evts &key (x-scale 1/32))
   "convert svg elems exported by the inkscape 'Play Selection' extension
 to sproutable cm-events."
-  (let* ((evts (sort (mapcar #'svg-ie:make-cm-line svg-evts) #'< :key (lambda (x) (slot-value x 'svg-ie:x1))))
-         (x-scale 1/32)
+  (let* ((evts (sort (mapcar #'svg-ie:make-cm-line (sanitize-x-coords svg-evts)) #'< :key (lambda (x) (slot-value x 'svg-ie:x1))))
          (x-offs (* -1 x-scale (slot-value (first evts) 'svg-ie::x1))))    
     (svg-lines->cm evts :x-offset x-offs :x-scale x-scale)))
 

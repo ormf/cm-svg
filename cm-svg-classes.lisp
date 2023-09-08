@@ -18,6 +18,7 @@
     ((events :initarg :events :initform '() :accessor svg-file-events) ;;; the events to export
      (global :initarg :global :initform '() :accessor svg-file-global) ;;; unused optional global params
      (id-hash :initarg :id-hash :initform (make-hash-table) :accessor svg-file-id-hash) ;;; hashtable for the ids of svg elements
+     (iinverse :initarg :inverse :initform nil :accessor svg-file-inverse) ;;; inverted colors (black backgound)
      (view :initarg :view :initform t :accessor svg-file-view)
      (width :initarg :width :initform nil :accessor width)
      (x-scale :initarg :x-scale :initform 32 :accessor x-scale) ;;; x-scale of events: 1 is a grid-point in the svg
@@ -30,7 +31,9 @@
      (barmultiplier :initarg :barmultiplier :initform 4 :accessor barmultiplier)
      (timesigs :initarg :timesigs :initform nil :accessor timesigs)
      (showgrid :initarg :showgrid :initform t :accessor showgrid) ;;; visibility flag for grid
-     (gridtype :initarg :gridtype :initform "4x4" :accessor gridtype))
+     (gridtype :initarg :gridtype :initform "4x4" :accessor gridtype)
+     (expand :initarg :expand :initform t :accessor expand
+             ))
     #+metaclasses
     (:metaclass io-class))
   (defparameter <svg-file> (find-class 'svg-file))

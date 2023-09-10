@@ -142,7 +142,7 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
                         (expand t)
                         &allow-other-keys)
   (declare (ignore global))
-  (break "events: ~a" events)
+;;;  (break "events: ~a" events)
   (let ((svg-file (make-instance 'svg-ie:svg-file)))
     (setf (svg-ie::elements svg-file)
           (append

@@ -1,0 +1,81 @@
+<style>
+:root{
+  --height: 50px;
+}
+
+.cursor{
+  position: absolute;
+  top:0;
+  left:50vw;
+  height: 100vh;
+  width: 2px;
+  background-color: red;
+}
+#svg{
+  position: absolute;
+#  top:calc(50vh - var(--height)/2);
+  top:0;
+  height: 100vh;
+  left:50vw;
+  transition: 1ms linear;
+}
+</style>
+
+<object id="svg" data="/tmp/html-display.svg" type="image/svg+xml"></object>
+<div class="cursor"></div>
+
+<script>
+let svg = document.getElementById("svg") ;
+let socket = new WebSocket("ws://localhost:13245");
+
+socket.onopen = function(e) {
+  console.log("[open] Connection established");
+  console.log("Sending to server");
+  socket.send("Heartbeat");
+};
+
+socket.onmessage = function(event) {
+console.log(`[message] Data received from server: ${event.data}`);
+// data should be string: "x,y" e.g. "-100px,-50px"
+let time = Number(`${event.data}`);
+  svg.style.transform = `translate(${event.data})`;
+};
+
+socket.onclose = function(event) {
+  if (event.wasClean) {
+    console.log(`[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+  }
+  else {
+    // e.g. server process killed or network down // event.code is usually 1006 in this case
+    console.log('[close] Connection died');
+  }
+};
+
+socket.onerror = function(error) {
+  console.log(`[error] ${error.message}`);
+};
+
+async function getImage(url) {
+  return new Promise((resolve, reject) => {
+    let img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function start() {
+  let svgURL = "../grafik/hdbg04p-sfz.svg";
+  
+  let img = await getImage(svgURL);
+  let w = img.width;
+  let h = img.height; 
+  
+  // print
+  console.log({w,h});
+  svg.width = w;
+  svg.height = h;
+}
+
+start();
+</script>

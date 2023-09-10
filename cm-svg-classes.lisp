@@ -32,8 +32,7 @@
      (timesigs :initarg :timesigs :initform nil :accessor timesigs)
      (showgrid :initarg :showgrid :initform t :accessor showgrid) ;;; visibility flag for grid
      (gridtype :initarg :gridtype :initform "4x4" :accessor gridtype)
-     (expand :initarg :expand :initform t :accessor expand
-             ))
+     (expand :initarg :expand :initform t :accessor expand))
     #+metaclasses
     (:metaclass io-class))
   (defparameter <svg-file> (find-class 'svg-file))

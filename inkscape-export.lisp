@@ -23,6 +23,7 @@
 (defparameter *osc-inkscape-export-in* nil)
 ;;; (defparameter cl-user::*tmpsnd* nil)
 
+#|
 (defun port-available-p (portno)
   (string= ""
            (string-trim '(#\NEWLINE)
@@ -30,9 +31,10 @@
                           (uiop::run-program (format nil "lsof -i:~d" portno)
                                              :ignore-error-status t
                                              :output out)))))
+|#
 
 (defmacro start-inkscape-osc (&optional (osc-conn '*osc-inkscape-export-in*))
-  `(if (port-available-p 1337)
+  `(if (ou:port-available-p 1337)
        (progn
          (setf ,osc-conn (incudine.osc:open :port 1337 :host "127.0.0.1" :direction :input :protocol :udp))
          (incudine:make-osc-responder ,osc-conn "/inkscape/play" ""

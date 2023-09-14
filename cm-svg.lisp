@@ -301,6 +301,52 @@ svg-file."
                                 :id (new-id fil 'line-ids)))))
     (svg-file-insert-line line myid fil)))
 
+(defmethod write-event ((obj midi-note-on) (fil svg-file) scoretime)
+  "convert a midi object into a freshly allocated svg-line object and
+insert it at the appropriate position into the events slot of
+svg-file."
+  (let* ((myid (sv obj :channel))
+         (x-scale (x-scale fil))
+         (stroke-width 0.5)
+         (line (let ((x1 (* x-scale scoretime))
+                     (y1 (* 1 (sv obj :keynum)))
+                     (width 0.5)
+                     (color "#404040")
+                     (opacity 1))
+                 (make-instance 'svg-ie::svg-line
+                                :x1 (float x1) :y1 (float y1)
+                                :x2 (float (+ x1 width)) :y2 (float y1)
+                                :stroke-width stroke-width
+                                :opacity opacity
+                                :stroke-color color 
+                                :attributes (format nil ":type midi-note-on :channel ~d" (sv obj :channel))
+                                ;; :fill-color color
+                                :id (new-id fil 'line-ids)))))
+    (svg-file-insert-line line myid fil)))
+
+(defmethod write-event ((obj midi-note-off) (fil svg-file) scoretime)
+  "convert a midi object into a freshly allocated svg-line object and
+insert it at the appropriate position into the events slot of
+svg-file."
+  (let* ((myid (sv obj :channel))
+         (x-scale (x-scale fil))
+         (stroke-width 0.5)
+         (line (let ((x1 (* x-scale scoretime))
+                     (y1 (* 1 (sv obj :keynum)))
+                     (width 0.5)
+                     (color "#a0a0a0")
+                     (opacity 1))
+                 (make-instance 'svg-ie::svg-line
+                                :x1 (float x1) :y1 (float y1)
+                                :x2 (float (+ x1 width)) :y2 (float y1)
+                                :stroke-width stroke-width
+                                :opacity opacity
+                                :stroke-color color
+                                :attributes (format nil ":type midi-note-off :channel ~d" (sv obj :channel))                  
+                                ;; :fill-color color
+                                :id (new-id fil 'line-ids)))))
+    (svg-file-insert-line line myid fil)))
+
 (defun recreate-from-attributes (args)
   "recreate a cm object according to the :attributes property of the
 svg element."
@@ -310,8 +356,18 @@ svg element."
   (apply #'make-instance 'midi
          (ou:get-props-list args '(:time :keynum :duration :amp :channel))))
 
-(add-svg-assoc-fns `((midi . ,(symbol-function 'svg->midi))))
+(defun svg->midi-note-on (&rest args)
+  (break "args: ~S" args)
+  (apply #'make-instance 'midi-note-on
+         (ou:get-props-list args '(:time :keynum :channel))))
 
+(defun svg->midi-note-off (&rest args)
+  (apply #'make-instance 'midi-note-off
+         (ou:get-props-list args '(:time :keynum :channel))))
+
+(add-svg-assoc-fns `((midi . ,(symbol-function 'svg->midi))))
+(add-svg-assoc-fns `((midi-note-on . ,(symbol-function 'svg->midi-note-on))))
+(add-svg-assoc-fns `((midi-note-off . ,(symbol-function 'svg->midi-note-off))))
 #|
 (defun get-props-list (attributes &rest props)
   (reduce (lambda (seq prop) (let ((val (getf attributes prop :not-supplied)))
@@ -382,13 +438,14 @@ svg element."
                            (progn
                              (when (not svg-ie::attributes) (setf (getf svg-ie::attributes :type) 'midi))
                              (if (svg-symbol->fn (getf svg-ie::attributes :type))
-                                 (push (recreate-from-attributes (list* :time (float (+ x-offset (* x-scale svg-ie::x1)))
-                                                                        :keynum svg-ie::y1
-                                                                        :duration (float (max 0.001 (* x-scale (- svg-ie::x2 svg-ie::x1))))
-                                                                        :amplitude svg-ie::opacity
-                                                                        :channel (color->chan svg-ie::color colormap)
-                                                                        (keynum->saved-keynum svg-ie::attributes)))
-                                       result)
+                                 (progn
+                                   (ou:ensure-prop svg-ie::attributes :channel (color->chan svg-ie::color colormap))
+                                   (push (recreate-from-attributes (list* :time (float (+ x-offset (* x-scale svg-ie::x1)))
+                                                                          :keynum svg-ie::y1
+                                                                          :duration (float (max 0.001 (* x-scale (- svg-ie::x2 svg-ie::x1))))
+                                                                          :amplitude svg-ie::opacity
+                                                                          (keynum->saved-keynum svg-ie::attributes)))
+                                         result))
                                  (warn "can't import type ~a" (getf svg-ie::attributes :type)))))
                        (inner (rest elems) result)))
                     (:else (inner (rest elems) (push (first elems) result))))))

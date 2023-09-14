@@ -64,7 +64,7 @@
 
 (defparameter *chat-handler* nil)
 
-(if (port-available-p 13245)
+(if (ou:port-available-p 13245)
     (setf *chat-handler* (clack:clackup #'chat-server :port 13245))
     (warn "port 13245 already in use!"))
 

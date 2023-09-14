@@ -357,7 +357,6 @@ svg element."
          (ou:get-props-list args '(:time :keynum :duration :amp :channel))))
 
 (defun svg->midi-note-on (&rest args)
-  (break "args: ~S" args)
   (apply #'make-instance 'midi-note-on
          (ou:get-props-list args '(:time :keynum :channel))))
 

@@ -18,7 +18,148 @@
 ;;;
 ;;; **********************************************************************
 
-(in-package :cl-user)
+(in-package :cm)
+
+(export 'sfz 'cm)
+
+(defun beat->time (beat &key (factor 4/10))
+  (if beat (* beat factor)))
+
+(defun time->beat (time &key (factor 4/10))
+  (if time (/ time factor)))
+
+;;; (chan->color 4)
+
+(defun get-first-in-region (evts region timescale)
+  (loop
+    for e in evts
+    until (>= (object-time e) (beat->time (* 16 (- (first region) 1)) :factor timescale))
+    finally (return (time->beat (object-time e) :factor timescale))))
+
+#|
+(defun free-voice (num)
+  (setf *curr-voices* (delete num *curr-voices*))
+  (display-send num :vn-nonvib-mf-4c -500))
+
+(defun free-all-voices ()
+  (dotimes (n 16)
+    (funcall (free-voice n)))
+  (setf *curr-voices* nil))
+|#
+
+(defun trim-region (obj &optional (start 0) end)
+  (let ((seq (sort (if (typep obj 'cm::container) (subobjects obj) obj)
+                   #'< :key #'object-time)))
+    (loop until (or (not seq) (>= (object-time (first seq)) start))
+          do (setf seq (cdr seq)))
+    (loop
+      with start-offs = (object-time (first seq))
+      for x in seq
+      if (or (not end) (<= (object-time x) end)) collect
+                                                 (let ((new (copy-object x)))
+                                                   (decf (object-time new) start-offs)
+                                                   new))))
+
+(defun region-play (name &key (absolute nil) (timescale 1) (region '(0 nil)) (durfac 1) (pstretchfn (lambda (x) (declare (ignore x)) 1)))
+  (let* ((obj (if absolute
+                  (import-events name :x-scale timescale)
+                  (import-events (format nil "/home/orm/work/kompositionen/heidelberg/grafik/~a.svg" name) :x-scale timescale)))
+         (evts (if obj (sort (subobjects obj) #'< :key #'object-time)))
+;;;         (offs (get-first-in-region evts region timescale))
+         )
+    (if evts
+        (progn
+;;;          (free-all-voices)
+          (sprout (mapcar (lambda (evt) (let ((keynum (sv evt :keynum)))
+                                     (sv* evt :duration durfac)
+                                     (if (typep evt 'sfz) (sv+ evt :amplitude 12)
+                                         (sv* evt :amplitude 2))
+                                     (setf (sv evt :keynum)
+                                           (+ 36 (* (- keynum 36)
+                                                    (funcall pstretchfn (1+ (* 1/16 (/ (object-time evt) timescale)))))))
+                                     evt))
+                          (apply #'trim-region evts
+                                 (mapcar (lambda (x) (if x (beat->time (* 16 (- x 1)) :factor timescale))) region))))
+;;          (browser-play (* offs 6.041) :tscale (/ 1/8 6.041))
+          )
+        (error "obj ~a not found!" (format nil "~a-seq" name)))))
+
+(in-package :clog-dsp-widgets)
+
+(progn
+  (defparameter cursor-pos nil)
+  (defparameter svg-shift nil)
+  (defparameter idx nil)
+  (defparameter data nil)
+  (defparameter transport nil)
+  (defparameter auto-return (make-ref 0)))
+
+(progn
+  (clear-bindings)
+  (setf cursor-pos (make-ref 0.5))
+  (setf svg-shift (make-ref 0))
+  (setf idx (make-ref 0))
+  (setf transport (make-ref 0))
+  (setf data (make-computed (lambda () (format nil "/josquin-mousse-~d.svg" (max 1 (min 6 (1+ (get-val idx)))))) ))
+  nil)
+
+(defun new-window (body)
+  "On-new-window handler."
+  (setf (title (html-document body)) "SVG Test")
+  (create-o-svg
+   body (bind-refs-to-attrs cursor-pos "cursor-pos" svg-shift "shift-x" data "data") :svg "/html-display.svg")
+;;;  (create-o-radio body (bind-refs-to-attrs idx "value") :css '(:width "6em") :labels (list (loop for idx from 1 to 6 collect idx)) :num 6)
+  (create-o-slider body (bind-refs-to-attrs svg-shift "value")
+                   :min -2000 :max 2000 :direction :right
+                   :css `(:display "inline-block" :height "1em" :width "100%"))
+  (create-o-toggle body (bind-refs-to-attrs transport "value")
+                   :label '("play" "stop") :background '("transparent" "#8f8")
+                   :css `(:display "inline-block" :height "1.2em" :width "3em"))
+  (create-o-toggle body (bind-refs-to-attrs auto-return "value")
+                   :label '("rtn") :css `(:display "inline-block" :height "1.2em" :width "3em")))
+
+(defun on-new-window (body)
+  (new-window body))
+
+;; Initialize the CLOG system with a boot file which contains the
+;; static js files. For customized uses copy the "www" subdirectory of
+;; the repository to your local project and adjust :static-root
+;; accordingly
+(defun start ()
+  (clear-bindings) ;;; start from scratch
+  (initialize #'on-new-window
+              :port 8080
+              :static-root (merge-pathnames "www/" (asdf:system-source-directory :clog-dsp-widgets))
+              :boot-file "/start.html")
+  ;; Open a browser to http://127.0.0.1:8080 - the default for CLOG apps
+  (open-browser))
+
+;;; (start) should start a webserver with some gui widgets that are
+;;; connected
+
+(start)
+;; (set-val cursor-pos 0.5)
+(defun play-svg ()
+  (labels ((inner (time)
+             (unless (zerop (get-val transport))
+                 (set-val svg-shift (+ (get-val svg-shift) 1))
+                 (let ((next (+ time 1/60)))
+                   (cm:at next #'inner next)))))
+    (inner (cm:now))))
+;;;(funcall my-watch)
+(defparameter my-watch (watch (let ((last-pos 0))
+                                (lambda () (if (zerop (get-val transport))
+                                          (let (cl-refs::*curr-ref*)
+                                            (format t "stopping~%")
+                                            (unless (zerop (get-val auto-return))
+                                              (set-val svg-shift last-pos )))
+                                          (progn
+                                            (format t "relocating~%")
+                                            (setf last-pos (let (cl-refs::*curr-ref*)
+                                                             (get-val svg-shift)))
+                                            (play-svg)))))))
+
+#|
 
 ;;; (ql:quickload '(clack websocket-driver alexandria cm-all))
 
@@ -75,6 +216,8 @@
 (defun broadcast-message (msg)
   (loop :for con :being :the :hash-key :of *connections* :do
     (websocket-driver:send con msg)))
+
+|#
 
 #|
 (defparameter *client-handler* nil)

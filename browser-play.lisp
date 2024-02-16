@@ -86,7 +86,7 @@
                    (at next #'inner next)))))
       (inner (now)))))
 
-;;; (browser-play 0)
+;;; (browser-play 1000 :tscale (get-tscale '(1 200)))
 
 (defun browser-locate (pos &key (px-scale *px-scale*))
   (cl-user::broadcast-message (format nil "~apx,0" (* pos px-scale))))

@@ -104,6 +104,13 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
        :staff-system-vis (staff-system-vis io)
        :bar-lines-vis (bar-lines-vis io)
        :showgrid (showgrid io)
+       :zoom (zoom io)
+       :cx (cx io)
+       :cy (cy io)
+       :w-width (w-width io)
+       :w-height (w-height io)
+       :w-x (w-x io)
+       :w-y (w-y io)
        :gridtype (gridtype io)
        :x-scale (x-scale io)
        :barstepsize (barstepsize io)
@@ -139,7 +146,7 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
 
 (defun cm-svg-export (&key events global (staff-system-vis t) (piano-roll-vis t) (fname "/tmp/test.svg") (inverse nil)
                         (showgrid t) (gridtype "4x4") (width 10000) (x-scale 8) (bar-lines-vis t) (barstepsize 4) (startbar 1) (barmultiplier 1) timesigs
-                        (expand t)
+                        (expand t) (zoom 1.4) (cx 350) (cy 360) (w-width 1920) (w-height 1080) (w-x 0) (w-y 0)
                         &allow-other-keys)
   (declare (ignore global))
 ;;;  (break "events: ~a" events)
@@ -156,7 +163,8 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
            (list (cons (make-instance 'svg-ie::svg-tl-layer :name "Events" :id "ebenen-id")
                        (sort (mapcar (lambda (chan) (cons (first chan) (reverse (rest chan)))) events)
                              #'string> :key (lambda (x) (slot-value (car x) 'svg-ie::name)))))))
-    (svg-ie:export-svg-file svg-file :fname fname :showgrid showgrid :gridtype gridtype :width width :inverse inverse)))
+    (svg-ie:export-svg-file svg-file :fname fname :showgrid showgrid :gridtype gridtype :width width :inverse inverse
+                            :zoom zoom :cx cx :cy cy :w-width w-width :w-height w-height :w-x w-x :w-y w-y)))
 
 (defun chan-eq? (chan layer-obj)
   "check if chan matches the ch<chan> in the name (label) of the
@@ -186,7 +194,12 @@ the elements slot."
        do (setf (gethash (string-upcase elem) color-hash) idx))
     color-hash))
 
-(defparameter *svg-colormap*
+(defparameter *svg-colormap-old* nil)
+(defparameter *svg-colormap* nil)
+
+;;; original colormap (< 09.2023)
+
+(setf *svg-colormap-old*
   (make-colormap
    #("#000000" "#800000" "#FF0000" "#808000" "#FFFF00" "#008000" "#00FF00"
      "#008080" "#00FFFF" "#000080" "#0000FF" "#800080" "#FF00FF" "#AA0000"
@@ -257,6 +270,81 @@ the elements slot."
      "#803309" "#AA4409" "#D45509" "#FF6609" "#00225E" "#003389" "#0044B3"
      "#281714" "#502D1F" "#78442A" "#A05A35" "#C87140" "#483E40" "#917C78"
      "#6C5D5C" "#806609" "#AA8809" "#D4AA09" "#112B09" "#225509" "#338009")))
+
+;;; new colormap (> 09.2023)
+
+(setf *svg-colormap*
+  (cm::make-colormap
+   #("#000000" "#800000" "#F00000" "#808000" "#D4AA00" "#008000" "#00AAD4"
+     "#008080" "#FF6600" "#000080" "#0000FF" "#800080" "#FF00FF" "#AA0000"
+     "#280B0B" "#501616" "#782121" "#A02C2C" "#483737" "#6C5353" "#552200"
+     "#803300" "#AA4400" "#D45500" "#FF6600" "#002255" "#003380" "#0044AA"
+     "#28170B" "#502D16" "#784421" "#A05A2C" "#C87137" "#483E37" "#917C6F"
+     "#6C5D53" "#806600" "#AA8800" "#D4AA00" "#112B00" "#225500" "#338000"
+
+     "#000001" "#800001" "#FF0001" "#808001" "#FFFF01" "#008001" "#00FF01"
+     "#008081" "#010000" "#000081" "#000100" "#800081" "#FF0100" "#AA0001"
+     "#280B0C" "#501617" "#782122" "#A02C2D" "#483738" "#6C5354" "#552201"
+     "#f07301" "#AA4401" "#D45501" "#FF6601" "#002256" "#003381" "#0044AB"
+     "#28170C" "#502D17" "#784422" "#A05A2D" "#C87138" "#483E38" "#917C70"
+     "#6C5D54" "#806601" "#AA8801" "#D4AA01" "#112B01" "#225501" "#338001"
+
+     "#0000F9" "#800002" "#FF0002" "#808002" "#FFFF02" "#008002" "#00FF02"
+     "#008082" "#010001" "#000082" "#000101" "#800082" "#FF0101" "#AA0002"
+     "#280B0D" "#501618" "#782123" "#A02C2E" "#483739" "#6C5355" "#552202"
+     "#803302" "#AA4402" "#D45502" "#FF6602" "#002257" "#003382" "#0044AC"
+     "#28170D" "#502D18" "#784423" "#A05A2E" "#C87139" "#483E39" "#917C71"
+     "#6C5D55" "#806602" "#AA8802" "#D4AA02" "#112B02" "#225502" "#338002"
+
+     "#000003" "#800003" "#FF0003" "#808003" "#FFFF03" "#008003" "#00FF03"
+     "#008083" "#010002" "#000102" "#f00083" "#800083" "#FF0102" "#AA0003"
+     "#280B0E" "#501619" "#782124" "#A02C2F" "#48373A" "#6C5356" "#552203"
+     "#803303" "#AA4403" "#D45503" "#FF6603" "#002258" "#003383" "#0044AD"
+     "#28170E" "#502D19" "#784424" "#A05A2F" "#C8713A" "#483E3A" "#917C72"
+     "#6C5D56" "#806603" "#AA8803" "#D4AA03" "#112B03" "#225503" "#338003"
+
+     "#000004" "#800004" "#FF0004" "#808004" "#FFFF04" "#008004" "#00FF04"
+     "#008084" "#010003" "#000084" "#000103" "#800084" "#FF0103" "#AA0004"
+     "#280B0F" "#50161A" "#782125" "#A02C30" "#48373B" "#6C5357" "#552204"
+     "#803304" "#AA4404" "#D45504" "#FF6604" "#002259" "#003384" "#0044AE"
+     "#28170F" "#502D1A" "#784425" "#A05A30" "#C8713B" "#483E3B" "#917C73"
+     "#6C5D57" "#806604" "#AA8804" "#D4AA04" "#112B04" "#225504" "#338004"
+
+     "#000005" "#800005" "#FF0005" "#808005" "#FFFF05" "#008005" "#00FF05"
+     "#008085" "#010004" "#000085" "#000104" "#800085" "#FF0104" "#AA0005"
+     "#280B10" "#50161B" "#782126" "#A02C31" "#48373C" "#6C5358" "#552205"
+     "#803305" "#AA4405" "#D45505" "#FF6605" "#00225A" "#003385" "#0044AF"
+     "#281710" "#502D1B" "#784426" "#A05A31" "#C8713C" "#483E3C" "#917C74"
+     "#6C5D58" "#806605" "#AA8805" "#D4AA05" "#112B05" "#225505" "#338005"
+
+     "#000006" "#800006" "#FF0006" "#808006" "#FFFF06" "#008006" "#00FF06"
+     "#008086" "#010005" "#000086" "#000105" "#800086" "#FF0105" "#AA0006"
+     "#280B11" "#50161C" "#782127" "#A02C32" "#48373D" "#6C5359" "#552206"
+     "#803306" "#AA4406" "#D45506" "#FF6606" "#00225B" "#003386" "#0044B0"
+     "#281711" "#502D1C" "#784427" "#A05A32" "#C8713D" "#483E3D" "#917C75"
+     "#6C5D59" "#806606" "#AA8806" "#D4AA06" "#112B06" "#225506" "#338006"
+
+     "#000007" "#800007" "#FF0007" "#808007" "#FFFF07" "#008007" "#00FF07"
+     "#008087" "#010006" "#000087" "#000106" "#800087" "#FF0106" "#AA0007"
+     "#280B12" "#50161D" "#782128" "#A02C33" "#48373E" "#6C535A" "#552207"
+     "#803307" "#AA4407" "#D45507" "#FF6607" "#00225C" "#003387" "#0044B1"
+     "#281712" "#502D1D" "#784428" "#A05A33" "#C8713E" "#483E3E" "#917C76"
+     "#6C5D5A" "#806607" "#AA8807" "#D4AA07" "#112B07" "#225507" "#338007"
+
+     "#000008" "#800008" "#FF0008" "#808008" "#FFFF08" "#008008" "#00FF08"
+     "#008088" "#010007" "#000088" "#000107" "#800088" "#FF0107" "#AA0008"
+     "#280B13" "#D3867E" "#782129" "#A02C34" "#48373F" "#6C535B" "#552208"
+     "#803308" "#AA4408" "#D45508" "#FF6608" "#00225D" "#003388" "#0044B2"
+     "#281713" "#502D1E" "#784429" "#A05A34" "#C8713F" "#483E3F" "#917C77"
+     "#6C5D5B" "#806608" "#AA8808" "#D4AA08" "#112B08" "#225508" "#338008"
+
+     "#00f002" "#800009" "#FF0009" "#808009" "#FFFF09" "#008009" "#00FF09"
+     "#008089" "#010008" "#000089" "#000108" "#800089" "#FF0108" "#AA0009"
+     "#280B14" "#50161F" "#78212A" "#A02C35" "#483740" "#6C535C" "#552209"
+     "#803309" "#AA4409" "#D45509" "#FF6609" "#00225E" "#003389" "#0044B3"
+     "#281714" "#502D1F" "#78442A" "#A05A35" "#C87140" "#483E40" "#917C78"
+     "#6C5D5C" "#806609" "#AA8809" "#D4AA09" "#112B09" "#225509" "#338009")))
+
 
 #|
 (remove-duplicates
@@ -347,6 +435,54 @@ svg-file."
                                 :id (new-id fil 'line-ids)))))
     (svg-file-insert-line line myid fil)))
 
+(defmethod write-event ((obj midi-control-change) (fil svg-file) scoretime)
+  "convert a midi object into a freshly allocated svg-line object and
+insert it at the appropriate position into the events slot of
+svg-file."
+  (let* ((myid (sv obj :channel))
+         (x-scale (x-scale fil))
+         (stroke-width 0.5)
+         (line (let ((x1 (* x-scale scoretime))
+                     (y1 (* 1 (sv obj :controller)))
+                     (width 0.5)
+                     (color (chan->color myid))
+                     (opacity (/ (sv obj :value) 127.0)))
+                 (make-instance 'svg-ie::svg-line
+                                :x1 (float x1) :y1 (float y1)
+                                :x2 (float (+ x1 width)) :y2 (float y1)
+                                :stroke-width stroke-width
+                                :opacity opacity
+                                :stroke-color color
+                                :attributes (format nil ":type midi-control-change :controller ~a :value ~a :channel ~d"
+                                                    (sv obj :controller) (sv obj :value) (sv obj :channel))                  
+                                ;; :fill-color color
+                                :id (new-id fil 'line-ids)))))
+    (svg-file-insert-line line myid fil)))
+
+(defmethod write-event ((obj midi-program-change) (fil svg-file) scoretime)
+  "convert a midi object into a freshly allocated svg-line object and
+insert it at the appropriate position into the events slot of
+svg-file."
+  (let* ((myid (sv obj :channel))
+         (x-scale (x-scale fil))
+         (stroke-width 0.5)
+         (line (let ((x1 (* x-scale scoretime))
+                     (y1 (* 1 (sv obj :program)))
+                     (width 0.5)
+                     (color (chan->color myid))
+                     (opacity 1))
+                 (make-instance 'svg-ie::svg-line
+                                :x1 (float x1) :y1 (float y1)
+                                :x2 (float (+ x1 width)) :y2 (float y1)
+                                :stroke-width stroke-width
+                                :opacity opacity
+                                :stroke-color color
+                                :attributes (format nil ":type midi-program-change :program ~a :channel ~d"
+                                                    (sv obj :program) (sv obj :channel))                  
+                                ;; :fill-color color
+                                :id (new-id fil 'line-ids)))))
+    (svg-file-insert-line line myid fil)))
+
 (defun recreate-from-attributes (args)
   "recreate a cm object according to the :attributes property of the
 svg element."
@@ -364,9 +500,20 @@ svg element."
   (apply #'make-instance 'midi-note-off
          (ou:get-props-list args '(:time :keynum :channel))))
 
+(defun svg->midi-control-change (&rest args)
+  (apply #'make-instance 'midi-control-change
+         (ou:get-props-list args '(:time :controller :value :channel))))
+
+(defun svg->midi-program-change (&rest args)
+  (apply #'make-instance 'midi-program-change
+         (ou:get-props-list args '(:time :program :channel))))
+
 (add-svg-assoc-fns `((midi . ,(symbol-function 'svg->midi))))
 (add-svg-assoc-fns `((midi-note-on . ,(symbol-function 'svg->midi-note-on))))
 (add-svg-assoc-fns `((midi-note-off . ,(symbol-function 'svg->midi-note-off))))
+(add-svg-assoc-fns `((midi-control-change . ,(symbol-function 'svg->midi-control-change))))
+(add-svg-assoc-fns `((midi-program-change . ,(symbol-function 'svg->midi-program-change))))
+
 #|
 (defun get-props-list (attributes &rest props)
   (reduce (lambda (seq prop) (let ((val (getf attributes prop :not-supplied)))
@@ -421,7 +568,6 @@ svg element."
       (let ((lines (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil :x-offset x-offs
                                       :group? group? :layer? layer?)))
         (inner lines)))))
-|#
 
 (defun svg-lines->cm (svg-lines &key (x-offset 0) (x-scale 1) end colormap)
   (labels ((inner (elems result)
@@ -449,15 +595,38 @@ svg element."
                        (inner (rest elems) result)))
                     (:else (inner (rest elems) (push (first elems) result))))))
     (inner svg-lines '())))
+|#
+
+(defun svg-lines->cm (svg-lines &key (x-offset 0) (x-scale 1) end colormap)
+  (loop
+    for elem in svg-lines
+    append (with-slots (svg-ie::x1 svg-ie::y1 svg-ie::x2 svg-ie::color svg-ie::opacity svg-ie::attributes)
+               elem
+             (if (or (not end) (<= (* x-scale svg-ie::x1) end))
+                 (progn
+                   (when (not svg-ie::attributes) (setf (getf svg-ie::attributes :type) 'midi))
+                   (if (svg-symbol->fn (getf svg-ie::attributes :type))
+                       (progn
+                         (ou:ensure-prop svg-ie::attributes :channel (color->chan svg-ie::color colormap))
+                         (list
+                          (recreate-from-attributes (list* :time (float (+ x-offset (* x-scale svg-ie::x1)))
+                                                           :keynum svg-ie::y1
+                                                           :duration (float (max 0.001 (* x-scale (- svg-ie::x2 svg-ie::x1))))
+                                                           :amplitude svg-ie::opacity
+                                                           (keynum->saved-keynum svg-ie::attributes)))))
+                       (warn "can't import type ~a" (getf svg-ie::attributes :type))))))
+      into result
+    finally (return result)))
 
 
 (defun svg->cm (file layer x-scale &key (x-offset 0) colormap start end group? layer?)
   (let* ((start-offs (if start (* -1 (/ start x-scale)) 0))
          (ende (if end (+ start-offs (/ end x-scale)) most-positive-fixnum)))
 ;;;    (break "x-offs: ~a ende: ~a" x-offs ende)
-    (svg-lines->cm (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil
-                                      :group? group? :layer? layer?)
-                   :x-scale x-scale :x-offset x-offset :colormap colormap :end ende)))
+    (svg-lines->cm
+     (svg-ie:svg->lines :infile file :layer layer :xquantize nil :yquantize nil
+                        :group? group? :layer? layer?)
+     :x-scale x-scale :x-offset x-offset :colormap colormap :end ende)))
 
 (defparameter *inkscape-export* (new seq :name "inkscape-export"))
 
@@ -530,6 +699,7 @@ to sproutable cm-events."
     (svg-lines->cm evts :x-offset x-offs :x-scale x-scale)))
 
 
-(export '(SVG->CM *SVG-COLORMAP* COLOR->CHAN CHAN->COLOR ADD-RECREATION-FN OPACITY->DB DB->OPACITY SVG-LINES->CM
-          INKSCAPE-EXPORT->CM)
+(export '(SVG->CM *SVG-COLORMAP-OLD* *SVG-COLORMAP* COLOR->CHAN CHAN->COLOR ADD-RECREATION-FN OPACITY->DB DB->OPACITY SVG-LINES->CM
+          INKSCAPE-EXPORT->CM
+          *SVG-X-SCALE*)
         'cm)

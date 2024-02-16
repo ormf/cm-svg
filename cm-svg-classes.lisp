@@ -30,6 +30,13 @@
      (startbar :initarg :startbar :initform 1 :accessor startbar)
      (barmultiplier :initarg :barmultiplier :initform 4 :accessor barmultiplier)
      (timesigs :initarg :timesigs :initform nil :accessor timesigs)
+     (zoom :accessor zoom :initarg :zoom :initform 1.4)
+     (cx :accessor cx :initarg :cx :initform 350)
+     (cy :accessor cy :initarg :cy :initform 360)
+     (w-width :accessor w-width :initarg :w-width :initform 1920)
+     (w-height :accessor w-height :initarg :w-height :initform 1080)
+     (w-x :accessor w-x :initarg :w-x :initform 0)
+     (w-y :accessor w-y :initarg :w-y :initform 0)
      (showgrid :initarg :showgrid :initform t :accessor showgrid) ;;; visibility flag for grid
      (gridtype :initarg :gridtype :initform "4x4" :accessor gridtype)
      (expand :initarg :expand :initform t :accessor expand))

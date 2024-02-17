@@ -89,6 +89,11 @@
 (progn
   (defparameter cursor-pos nil)
   (defparameter svg-shift nil)
+  (defparameter svg-width nil)
+  (defparameter svg-scale nil)
+  (defparameter svg-piano-roll nil)
+  (defparameter svg-staff-systems nil)
+  (defparameter svg-bar-lines nil)
   (defparameter idx nil)
   (defparameter data nil)
   (defparameter transport nil)
@@ -98,25 +103,46 @@
   (clear-bindings)
   (setf cursor-pos (make-ref 0.5))
   (setf svg-shift (make-ref 0))
+  (setf svg-width (make-ref 0))
+  (setf svg-scale (make-ref 20))
+  (setf svg-piano-roll (make-ref 1))
+  (setf svg-staff-systems (make-ref 1))
+  (setf svg-bar-lines (make-ref 1))
   (setf idx (make-ref 0))
   (setf transport (make-ref 0))
-  (setf data (make-computed (lambda () (format nil "/josquin-mousse-~d.svg" (max 1 (min 6 (1+ (get-val idx)))))) ))
+  (setf data (make-ref "hdbg04b-sfz.svg"))
   nil)
 
 (defun new-window (body)
   "On-new-window handler."
   (setf (title (html-document body)) "SVG Test")
   (create-o-svg
-   body (bind-refs-to-attrs cursor-pos "cursor-pos" svg-shift "shift-x" data "data") :svg "/html-display.svg")
+   body (bind-refs-to-attrs svg-width "width"
+                            cursor-pos "cursor-pos"
+                            svg-shift "shift-x"
+                            data "data"
+                            svg-scale "scale"
+                            svg-piano-roll "piano-roll"
+                            svg-staff-systems "staff-systems"
+                            svg-bar-lines "bar-lines")
+   :svg "/html-display.svg")
 ;;;  (create-o-radio body (bind-refs-to-attrs idx "value") :css '(:width "6em") :labels (list (loop for idx from 1 to 6 collect idx)) :num 6)
-  (create-o-slider body (bind-refs-to-attrs svg-shift "value")
-                   :min -2000 :max 2000 :direction :right
+  (create-o-slider body (bind-refs-to-attrs svg-shift "value" svg-width "max")
+                   :min 0 :max 200 :direction :right
                    :css `(:display "inline-block" :height "1em" :width "100%"))
   (create-o-toggle body (bind-refs-to-attrs transport "value")
                    :label '("play" "stop") :background '("transparent" "#8f8")
                    :css `(:display "inline-block" :height "1.2em" :width "3em"))
   (create-o-toggle body (bind-refs-to-attrs auto-return "value")
-                   :label '("rtn") :css `(:display "inline-block" :height "1.2em" :width "3em")))
+                   :label '("rtn") :css `(:display "inline-block" :height "1.2em" :width "3em"))
+  (create-o-toggle body (bind-refs-to-attrs svg-piano-roll "value")
+                   :label '("pno") :css `(:display "inline-block" :height "1.2em" :width "3em"))
+  (create-o-toggle body (bind-refs-to-attrs svg-staff-systems "value")
+                   :label '("stf") :css `(:display "inline-block" :height "1.2em" :width "3em"))
+  (create-o-toggle body (bind-refs-to-attrs svg-bar-lines "value")
+                   :label '("bar") :css `(:display "inline-block" :height "1.2em" :width "3em")))
+
+(set-val svg-width 300)
 
 (defun on-new-window (body)
   (new-window body))
@@ -138,15 +164,21 @@
 ;;; connected
 
 (start)
+
 ;; (set-val cursor-pos 0.5)
+;; (set-val svg-width 8000)
+
+;; (set-val svg-scale 20)
+
 (defun play-svg ()
   (labels ((inner (time)
              (unless (zerop (get-val transport))
-                 (set-val svg-shift (+ (get-val svg-shift) 1))
+                 (set-val svg-shift (+ (get-val svg-shift) 0.1))
                  (let ((next (+ time 1/60)))
                    (cm:at next #'inner next)))))
     (inner (cm:now))))
 ;;;(funcall my-watch)
+
 (defparameter my-watch (watch (let ((last-pos 0))
                                 (lambda () (if (zerop (get-val transport))
                                           (let (cl-refs::*curr-ref*)
@@ -161,6 +193,13 @@
 
 #|
 
+(set-val svg-piano-roll 0)
+(set-val svg-bar-lines 0)
+(set-val svg-staff-systems 0)
+
+(progn
+ (set-val cursor-pos 0.2)
+ (set-val cursor-pos 0.5))
 ;;; (ql:quickload '(clack websocket-driver alexandria cm-all))
 
 ;; make a hash table to map connections to nicknames

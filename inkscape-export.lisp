@@ -54,4 +54,4 @@
  ;;; (stop-inkscape-osc)
 (start-inkscape-osc)
 
-(export '(*osc-incudine-export-in* start-inkscape-osc stop-inkscape-osc) :cm)
+(export '(*osc-inkscape-export-in* start-inkscape-osc stop-inkscape-osc) :cm)

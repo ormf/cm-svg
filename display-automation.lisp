@@ -104,14 +104,17 @@
   (setf cursor-pos (make-ref 0.5))
   (setf svg-shift (make-ref 0))
   (setf svg-width (make-ref 0))
-  (setf svg-scale (make-ref 20))
+  (setf svg-scale (make-ref 10))
   (setf svg-piano-roll (make-ref 1))
   (setf svg-staff-systems (make-ref 1))
   (setf svg-bar-lines (make-ref 1))
   (setf idx (make-ref 0))
   (setf transport (make-ref 0))
-  (setf data (make-ref "hdbg04b-sfz.svg"))
+  (setf data (make-ref "hdbg04q-sfz.svg"))
   nil)
+
+(set-val data "hdbg04q-sfz.svg")
+(set-val svg-scale 9.5)
 
 (defun new-window (body)
   "On-new-window handler."
@@ -142,8 +145,6 @@
   (create-o-toggle body (bind-refs-to-attrs svg-bar-lines "value")
                    :label '("bar") :css `(:display "inline-block" :height "1.2em" :width "3em")))
 
-(set-val svg-width 300)
-
 (defun on-new-window (body)
   (new-window body))
 
@@ -151,19 +152,20 @@
 ;; static js files. For customized uses copy the "www" subdirectory of
 ;; the repository to your local project and adjust :static-root
 ;; accordingly
-(defun start ()
+(defun start-svg-display (&key (static-root (merge-pathnames "www/" (asdf:system-source-directory :clog-dsp-widgets))))
   (clear-bindings) ;;; start from scratch
-  (initialize #'on-new-window
+  (initialize nil
               :port 8080
-              :static-root (merge-pathnames "www/" (asdf:system-source-directory :clog-dsp-widgets))
+              :static-root static-root
               :boot-file "/start.html")
   ;; Open a browser to http://127.0.0.1:8080 - the default for CLOG apps
-  (open-browser))
+  (set-on-new-window  #'on-new-window :path "/svg-display" :boot-file "/start.html")
+  (open-browser :url "http://127.0.0.1:8080/svg-display"))
 
 ;;; (start) should start a webserver with some gui widgets that are
 ;;; connected
 
-(start)
+;;; (start-svg-display)
 
 ;; (set-val cursor-pos 0.5)
 ;; (set-val svg-width 8000)
@@ -182,20 +184,23 @@
 (defparameter my-watch (watch (let ((last-pos 0))
                                 (lambda () (if (zerop (get-val transport))
                                           (let (cl-refs::*curr-ref*)
-                                            (format t "stopping~%")
+;;                                            (format t "stopping~%")
                                             (unless (zerop (get-val auto-return))
                                               (set-val svg-shift last-pos )))
                                           (progn
-                                            (format t "relocating~%")
+;;                                            (format t "relocating~%")
                                             (setf last-pos (let (cl-refs::*curr-ref*)
                                                              (get-val svg-shift)))
                                             (play-svg)))))))
+
 
 #|
 
 (set-val svg-piano-roll 0)
 (set-val svg-bar-lines 0)
 (set-val svg-staff-systems 0)
+
+(get-val svg-width)
 
 (progn
  (set-val cursor-pos 0.2)
@@ -458,5 +463,22 @@ socket.onerror = function(error) {
   (setf *client-handler* (clack:clackup #'client-server :port 8080
                                                         :document-root (truename "/tmp/"))))
 
+
+309.1 px -2390 em
+
+1494.4px -2395.8 em
+
+(* 8912 (/ 3.7179809)) -> 2397.0
+
+(/ 2397 8912.0) 0.2689632
+(/ 2390 8912.0) 0.26817775
+
+1500 = 2397
+200 = 2390
+
+
+
+
+(+ 2337 60)
 
 |#

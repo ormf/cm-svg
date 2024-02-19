@@ -14,7 +14,8 @@
   :license "licensed under the Lisp LLGPL. See
   http://www.cliki.net/LLGPL for the text of this agreement."
   :depends-on (#:svg-import-export #:incudine #:of-incudine-dsps
-               #:cm-svg #:clog-dsp-widgets)
+               #:cl-refs #:cm-svg #:clog-dsp-widgets)
   :serial t
-  :components ((:file "inkscape-export")
+  :components ((:file "package")
+               (:file "inkscape-export")
                (:file "display-automation")))

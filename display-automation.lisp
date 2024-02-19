@@ -20,7 +20,7 @@
 
 (in-package :cm)
 
-(export 'sfz 'cm)
+;;; (export 'sfz 'cm)
 
 (defun beat->time (beat &key (factor 4/10))
   (if beat (* beat factor)))
@@ -60,65 +60,127 @@
                                                    (decf (object-time new) start-offs)
                                                    new))))
 
-(defun region-play (name &key (absolute nil) (timescale 1) (region '(0 nil)) (durfac 1) (pstretchfn (lambda (x) (declare (ignore x)) 1)))
-  (let* ((obj (if absolute
-                  (import-events name :x-scale timescale)
-                  (import-events (format nil "/home/orm/work/kompositionen/heidelberg/grafik/~a.svg" name) :x-scale timescale)))
-         (evts (if obj (sort (subobjects obj) #'< :key #'object-time)))
+(defun seq-play (obj)
+  (let* ((evts (subobjects obj))
 ;;;         (offs (get-first-in-region evts region timescale))
          )
     (if evts
         (progn
-;;;          (free-all-voices)
-          (sprout (mapcar (lambda (evt) (let ((keynum (sv evt :keynum)))
-                                     (sv* evt :duration durfac)
-                                     (if (typep evt 'sfz) (sv+ evt :amplitude 12)
-                                         (sv* evt :amplitude 2))
-                                     (setf (sv evt :keynum)
-                                           (+ 36 (* (- keynum 36)
-                                                    (funcall pstretchfn (1+ (* 1/16 (/ (object-time evt) timescale)))))))
-                                     evt))
-                          (apply #'trim-region evts
-                                 (mapcar (lambda (x) (if x (beat->time (* 16 (- x 1)) :factor timescale))) region))))
-;;          (browser-play (* offs 6.041) :tscale (/ 1/8 6.041))
-          )
-        (error "obj ~a not found!" (format nil "~a-seq" name)))))
+          (let ((curr-pos (get-val svg-shift)))
+            (dolist (obj evts)
+              (when (>= (object-time obj) curr-pos)
+                (let ((obj (copy-object obj)))
+                  (setf (sv obj :time) (float (* (get-val svg-timescale) (- (sv obj :time) curr-pos))))
+                  (sv* obj :duration (get-val svg-timescale))
+;;;                  (format t "~a~%" obj)
+                  (sprout obj))
+                )
+              ))
+          ;;          (browser-play (* offs 6.041) :tscale (/ 1/8 6.041))
+          ))))
 
-(in-package :clog-dsp-widgets)
+(defmacro sv- (obj slot val &body more) (svaux obj '- slot val more))
+
+(seq-play (find-object "hdbg04q-sfz-seq"))
+
+
+2481.235
+
+(set-val svg-timescale 1/8)
+
+(let ((evts (sort (mapcar #'copy-object (subobjects (get-val svg-seq))) #'< :key #'object-time)))
+  (setf (object-time (first evts)) 1000)
+  evts
+  )
+
+
+(sort (copy-tree (subobjects (get-val svg-seq))) #'< :key #'object-time)
+
+(region-play (get-val svg-seq) :timescale 15 :region (list (get-val svg-shift) nil))
+
+;;; (use-package :clog)
 
 (progn
   (defparameter cursor-pos nil)
   (defparameter svg-shift nil)
   (defparameter svg-width nil)
   (defparameter svg-scale nil)
+  (defparameter svg-seq nil)
+  (defparameter svg-timescale nil)
   (defparameter svg-piano-roll nil)
   (defparameter svg-staff-systems nil)
   (defparameter svg-bar-lines nil)
   (defparameter idx nil)
   (defparameter data nil)
   (defparameter transport nil)
-  (defparameter auto-return (make-ref 0)))
+  (defparameter auto-return (make-ref 0))
+  (defparameter play-watch nil)
+  (defparameter data-watch nil))
 
 (progn
   (clear-bindings)
+  (when play-watch (funcall play-watch))
+  (when data-watch (funcall data-watch))
   (setf cursor-pos (make-ref 0.5))
   (setf svg-shift (make-ref 0))
+  (setf svg-seq (make-ref nil))
   (setf svg-width (make-ref 0))
-  (setf svg-scale (make-ref 10))
+  (setf svg-scale (make-ref 9.5))
+  (setf svg-timescale (make-ref 1/8))
   (setf svg-piano-roll (make-ref 1))
   (setf svg-staff-systems (make-ref 1))
   (setf svg-bar-lines (make-ref 1))
   (setf idx (make-ref 0))
   (setf transport (make-ref 0))
   (setf data (make-ref "hdbg04q-sfz.svg"))
+  (setf play-watch (watch (let ((last-pos 0))
+                            (lambda () (if (zerop (get-val transport))
+                                      (let (cl-refs::*curr-ref*)
+                                        (format t "stopping~%")
+                                        (incudine:node-free-all)
+                                        (incudine:flush-pending)
+                                        (unless (zerop (get-val auto-return))
+                                          (set-val svg-shift last-pos )))
+                                      (let (cl-refs::*curr-ref*)
+                                        (format t "relocating~%")
+                                        (setf last-pos (get-val svg-shift))
+                                        (seq-play (get-val svg-seq))
+                                        (svg-play)
+
+))))))
+  (setf data-watch (watch (lambda ()
+;;;                            (format t "reset-seq")
+                            (set-val svg-seq
+                                     (let ((seq
+                                             (cm:import-events
+                                              (namestring
+                                               (merge-pathnames
+                                                (format nil "www/~A" (get-val data))
+                                                (asdf:system-source-directory :clog-dsp-widgets)))
+                                              :x-scale 1)))
+                                       (setf (container-subobjects seq) (sort (subobjects seq) #'< :key #'object-time))
+                                       seq)))))
   nil)
 
+
+
+;;; (set-val svg-timescale 1/8)
+
+
+;;; (get-val svg-seq)
+;;; (set-val svg-timescale 1)
+
+
+
+;;, (set-val data "hdbg04b-sfz.svg")
 (set-val data "hdbg04q-sfz.svg")
-(set-val svg-scale 9.5)
+;;; (set-val svg-scale 9.5)
+;;; (get-val svg-seq)
+;;; (get-val svg-width)
 
 (defun new-window (body)
   "On-new-window handler."
-  (setf (title (html-document body)) "SVG Test")
+  (setf (clog:title (clog:html-document body)) "SVG Test")
   (create-o-svg
    body (bind-refs-to-attrs svg-width "width"
                             cursor-pos "cursor-pos"
@@ -154,13 +216,13 @@
 ;; accordingly
 (defun start-svg-display (&key (static-root (merge-pathnames "www/" (asdf:system-source-directory :clog-dsp-widgets))))
   (clear-bindings) ;;; start from scratch
-  (initialize nil
+  (clog:initialize nil
               :port 8080
               :static-root static-root
               :boot-file "/start.html")
   ;; Open a browser to http://127.0.0.1:8080 - the default for CLOG apps
-  (set-on-new-window  #'on-new-window :path "/svg-display" :boot-file "/start.html")
-  (open-browser :url "http://127.0.0.1:8080/svg-display"))
+  (clog:set-on-new-window  #'on-new-window :path "/svg-display" :boot-file "/start.html")
+  (clog:open-browser :url "http://127.0.0.1:8080/svg-display"))
 
 ;;; (start) should start a webserver with some gui widgets that are
 ;;; connected
@@ -170,33 +232,25 @@
 ;; (set-val cursor-pos 0.5)
 ;; (set-val svg-width 8000)
 
-;; (set-val svg-scale 20)
+;; (set-val svg-scale 9.5)
 
-(defun play-svg ()
+;;; (set-val svg-timescale 0.125) 
+
+(defun svg-play ()
   (labels ((inner (time)
              (unless (zerop (get-val transport))
-                 (set-val svg-shift (+ (get-val svg-shift) 0.1))
+               (when (> (get-val svg-shift) (get-val svg-width)) (set-val transport 0))
+               (set-val svg-shift (+ (get-val svg-shift) (* 1.067 (float (get-val svg-timescale)))))
                  (let ((next (+ time 1/60)))
                    (cm:at next #'inner next)))))
     (inner (cm:now))))
 ;;;(funcall my-watch)
 
-(defparameter my-watch (watch (let ((last-pos 0))
-                                (lambda () (if (zerop (get-val transport))
-                                          (let (cl-refs::*curr-ref*)
-;;                                            (format t "stopping~%")
-                                            (unless (zerop (get-val auto-return))
-                                              (set-val svg-shift last-pos )))
-                                          (progn
-;;                                            (format t "relocating~%")
-                                            (setf last-pos (let (cl-refs::*curr-ref*)
-                                                             (get-val svg-shift)))
-                                            (play-svg)))))))
-
 
 #|
 
 (set-val svg-piano-roll 0)
+(set-val svg-scale 9.5)
 (set-val svg-bar-lines 0)
 (set-val svg-staff-systems 0)
 
@@ -207,278 +261,16 @@
  (set-val cursor-pos 0.5))
 ;;; (ql:quickload '(clack websocket-driver alexandria cm-all))
 
-;; make a hash table to map connections to nicknames
-(defparameter *connections* (make-hash-table))
 
-;; and assign a random nickname to a user upon connection
-(defun handle-new-connection (con)
-  (setf (gethash con *connections*)
-        (format nil "user-~a" (random 100000))))
+1000% - 1094
+500% - 517
+100% 60 .. -60
+200% 60 .. -180
+300% 60 .. -300
+400& 60 .. -420
 
-(defun broadcast-to-room (connection message)
-  (let ((message (format nil "~a: ~a"
-                         (gethash connection *connections*)
-                         message)))
-    (loop :for con :being :the :hash-key :of *connections* :do
-          (websocket-driver:send con message))))
+(- (* 2 (+ 517 60)) 60)
 
-(defun handle-close-connection (connection)
-  (let ((message (format nil " .... ~a has left."
-                         (gethash connection *connections*))))
-    (remhash connection *connections*)
-    (loop :for con :being :the :hash-key :of *connections* :do
-          (websocket-driver:send con message))))
-
-(defparameter *ws* nil)
-
-(defun chat-server (env)
-  (let ((ws (websocket-driver:make-server env)))
-    (websocket-driver:on :open ws
-                         (lambda () (handle-new-connection ws)))
-    (websocket-driver:on :message ws
-                         (lambda (msg) (broadcast-to-room ws msg)))
-    (websocket-driver:on :close ws
-                         (lambda (&key code reason)
-                           (declare (ignore code reason))
-                           (handle-close-connection ws)))
-    (lambda (responder)
-      (declare (ignore responder))
-      (websocket-driver:start-connection ws)))) ; send the handshake
-
-;; keep the handler around so that you can stop your server later on
-
-(defparameter *chat-handler* nil)
-
-(if (ou:port-available-p 13245)
-    (setf *chat-handler* (clack:clackup #'chat-server :port 13245))
-    (warn "port 13245 already in use!"))
-
-;;; (clack:stop *chat-handler*)
-
-(defparameter *html* nil)
-
-(defun broadcast-message (msg)
-  (loop :for con :being :the :hash-key :of *connections* :do
-    (websocket-driver:send con msg)))
-
-|#
-
-#|
-(defparameter *client-handler* nil)
-
-(defun client-server (env)
-    (declare (ignore env))
-    `(200 (:content-type "text/html")
-          (,*html*)))
-
-
-
-(defun scroll (time xoffs)
-  (unless (< xoffs -1920)
-    (let ((next (+ time (* 100 (/ incudine::*sample-rate* 1000)))))
-      (broadcast-message (format nil "~apx,0px" xoffs))    
-      (incudine:at next #'scroll next (1- xoffs)))))
-
-;;; (broadcast-message (format nil "~apx,0px" 500))
-
-(defparameter *from-pd* (fudi:open :port 3010))
-(defparameter *fudi-responder* nil)
-
-(scratch::recv-start *from-pd*)
-
-(setf *fudi-responder*
-      (incudine::make-fudi-responder
-       *from-pd*
-       (lambda (msg)
-         (broadcast-message (format nil "~{~apx,~apx~}" msg)))))
-
-(scroll (incudine:now) 0)
-(* 49.62017 (/ 496994 497777)) 49.542118
-
-(broadcast-message "-10px,00px")
-
-(loop for xoffs from 0 downto -300)
-
-
-
-(progn
-  (setf *html*
-        "<!doctype html>
-
-<html lang=\"en\">
-<head>
-  <meta charset=\"utf-8\">
-  <title>LISP-CHAT</title>
-</head>
-<body>
-    <img src=\"./test.svg\"> </img>
-
-</body>
-</html>
-")
-  (when *client-handler* (clack:stop *client-handler*))
-  (setf *client-handler* (clack:clackup #'client-server :port 8080
-                                                        :document-root (truename "/tmp/"))))
-
-;;; (clack::find-handler :hunchentoot)
-
-;;; (clack.handler.hunchentoot::run)
-
-(hunchentoot:define-easy-handler (say-yo :uri "/yo") (name)
-  (setf (hunchentoot:content-type*) "text/plain")
-  (format nil "Hey~@[ ~A~]!" name))
-
-;;; (ql:where-is-system "hunchentoot")
-
-(defvar *acceptor* (make-instance 'easy-acceptor
-        :port 4242
-        :document-root (truename "work/kompositionen/heidelberg/grafik/")))
-
-
-
-(progn
-  (setf *html*
-      "<style>
-:root{
-  --height: 50px;
-}
-
-.cursor{
-  position: absolute;
-  top:0;
-  left:50vw;
-  height: 100vh;
-  width: 2px;
-  background-color: red;
-}
-#svg{
-  position: absolute;
-#  top:calc(50vh - var(--height)/2);
-  top:0;
-  height: 50vh;
-  left:50vw;
-  transition: 1ms linear;
-}
-</style>
-
-<object id=\"svg\" data=\"https://upload.wikimedia.org/wikipedia/commons/6/62/Music_notation.svg\" type=\"image/svg+xml\"></object>
-<div class=\"cursor\"></div>
-
-<script>
-let svg = document.getElementById(\"svg\") ;
-let socket = new WebSocket(\"ws://localhost:12345\");
-
-socket.onopen = function(e) {
-  console.log(\"[open] Connection established\");
-  console.log(\"Sending to server\");
-  socket.send(\"Heartbeat\");
-};
-
-socket.onmessage = function(event) {
-  console.log(`[message] Data received from server: ${event.data}`);
-  // data should be string: \"x,y\" e.g. \"-100px,-50px\"
-  svg.style.transform = `translate(${event.data})`;
-};
-
-socket.onclose = function(event) {
-  if (event.wasClean) {
-    console.log(`[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
-  }
-  else {
-    // e.g. server process killed or network down // event.code is usually 1006 in this case
-    console.log('[close] Connection died');
-  }
-};
-
-socket.onerror = function(error) {
-  console.log(`[error] ${error.message}`);
-};
-</script>
-")
-  (when *client-handler* (clack:stop *client-handler*))
-  (setf *client-handler* (clack:clackup #'client-server :port 8080
-                                                        :document-root (truename "/tmp/"))))
-
-
-(progn
-  (setf *html*
-      "<style>
-:root{
-  --height: 50px;
-}
-
-.cursor{
-  position: absolute;
-  top:0;
-  left:50vw;
-  height: 100vh;
-  width: 2px;
-  background-color: red;
-}
-#svg{
-  position: absolute;
-#  top:calc(50vh - var(--height)/2);
-  top:0;
-  height: 100vh;
-  left:50vw;
-  transition: 1ms linear;
-}
-</style>
-
-<object id=\"svg\" data=\"http://localhost/hdbg04l-sfz.svg\" type=\"image/svg+xml\"></object>
-<div class=\"cursor\"></div>
-
-<script>
-let svg = document.getElementById(\"svg\") ;
-let socket = new WebSocket(\"ws://localhost:12345\");
-
-socket.onopen = function(e) {
-  console.log(\"[open] Connection established\");
-  console.log(\"Sending to server\");
-  socket.send(\"Heartbeat\");
-};
-
-socket.onmessage = function(event) {
-  console.log(`[message] Data received from server: ${event.data}`);
-  // data should be string: \"x,y\" e.g. \"-100px,-50px\"
-  svg.style.transform = `translate(${event.data})`;
-};
-
-socket.onclose = function(event) {
-  if (event.wasClean) {
-    console.log(`[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
-  }
-  else {
-    // e.g. server process killed or network down // event.code is usually 1006 in this case
-    console.log('[close] Connection died');
-  }
-};
-
-socket.onerror = function(error) {
-  console.log(`[error] ${error.message}`);
-};
-</script>
-")
-  (when *client-handler* (clack:stop *client-handler*))
-  (setf *client-handler* (clack:clackup #'client-server :port 8080
-                                                        :document-root (truename "/tmp/"))))
-
-
-309.1 px -2390 em
-
-1494.4px -2395.8 em
-
-(* 8912 (/ 3.7179809)) -> 2397.0
-
-(/ 2397 8912.0) 0.2689632
-(/ 2390 8912.0) 0.26817775
-
-1500 = 2397
-200 = 2390
-
-
-
-
-(+ 2337 60)
+60 .. -60 bei 100%
 
 |#

@@ -59,20 +59,19 @@
         (progn
           (let ((curr-pos (get-val svg-shift)))
             (dolist (obj evts)
-              (when (>= (+ (object-time obj) (sv obj :duration)) curr-pos)
-                (let ((obj (copy-object obj)))
-                  (if (< (object-time obj) curr-pos)
-                      (progn
-                        (setf (sv obj :duration) (* (get-val svg-timescale)
-                                                    (- (sv obj duration)
-                                                       (- curr-pos (object-time obj)))))
-                        (setf (sv obj :time) 0))
-                      (progn
-                        (setf (sv obj :time) (float (* (get-val svg-timescale) (- (sv obj :time) curr-pos))))
-                        (sv* obj :duration (get-val svg-timescale))))
+              (let ((obj-end (+ (object-time obj) (sv obj :duration))))
+                (when (>= obj-end curr-pos)
+                  (let ((obj (copy-object obj)))
+                    (if (< (object-time obj) curr-pos)
+                        (progn
+                          (setf (sv obj :duration) (* (get-val svg-timescale) (- obj-end curr-pos)))
+                          (setf (sv obj :time) 0))
+                        (progn
+                          (setf (sv obj :time) (float (* (get-val svg-timescale) (- (sv obj :time) curr-pos))))
+                          (sv* obj :duration (get-val svg-timescale))))
 ;;;                  (format t "~a~%" obj)
-                  (sprout obj))
-                )
+                    (sprout obj))
+                  ))
               ))
           ;;          (browser-play (* offs 6.041) :tscale (/ 1/8 6.041))
           ))))
@@ -143,15 +142,6 @@
 
 ;;; (find-object "hdbg04q-sfz-seq")
 
-4 = 1 Schlag bei 1/4
-
-
-
-(set-val svg-timescale (get-timescale 1/4 60))
-
-
-
-;;; (set-val svg-timescale 1/8)
 
 
 ;;; (get-val svg-seq)
@@ -266,15 +256,11 @@
 (defun svg-play ()
   (labels ((inner (time)
              (unless (zerop (get-val transport))
-               (when (> (get-val svg-shift) (get-val svg-width)) (set-val transport 0))
+               (when (> (get-val svg-shift) (+ 2 (get-val svg-width))) (set-val transport 0))
                (set-val svg-shift (+ (get-val svg-shift) (* 1.067 (float (/ 1/64 (get-val svg-timescale))))))
                  (let ((next (+ time 1/60)))
                    (cm:at next #'inner next)))))
     (inner (cm:now))))
-
-(set-val svg-timescale 1/16) (/ 1/8)
-
-
 
 ;;;(funcall my-watch)
 

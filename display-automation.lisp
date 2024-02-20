@@ -209,9 +209,7 @@
                               svg-scale "scale"
                               svg-piano-roll "piano-roll"
                               svg-staff-systems "staff-systems"
-                              svg-bar-lines "bar-lines")
-     :svg "/html-display.svg")
-;;;  (create-o-radio body (bind-refs-to-attrs idx "value") :css '(:width "6em") :labels (list (loop for idx from 1 to 6 collect idx)) :num 6)
+                              svg-bar-lines "bar-lines"))
     (create-o-slider body (bind-refs-to-attrs svg-shift "value" svg-width "max")
                      :min 0 :max 200 :direction :right
                      :css `(:display "inline-block" :height "1em" :width "100%"))
@@ -227,7 +225,8 @@
                      :label '("stf") :css `(:display "inline-block" :height "1.2em" :width "3em"))
     (create-o-toggle body (bind-refs-to-attrs svg-bar-lines "value")
                      :label '("bar") :css `(:display "inline-block" :height "1.2em" :width "3em"))
-    (set-keyboard-shortcuts body transport-toggle)))
+    (set-keyboard-shortcuts body transport-toggle)
+    ))
 
 
 

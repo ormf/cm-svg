@@ -178,34 +178,58 @@
 ;;; (get-val svg-seq)
 ;;; (get-val svg-width)
 
+(defun set-keyboard-shortcuts (container transport-toggle)
+  (clog:js-execute
+   container
+   (format nil "document.onkeydown = function (event) {
+  if (event.which == 32 || event.code == 'Space') {
+    let transportToggle = document.getElementById('~a'); 
+    let currValue = transportToggle.getAttribute('value');
+    transportToggle.externalValueChange = false;
+    if (currValue == 0) {
+      transportToggle.setAttribute('value', 1);
+    }
+    else {
+      transportToggle.setAttribute('value', 0);
+    }
+  }
+};
+"
+           (clog:html-id transport-toggle))))
+
 (defun new-window (body)
   "On-new-window handler."
-  (setf (clog:title (clog:html-document body)) "SVG Test")
-  (create-o-svg
-   body (bind-refs-to-attrs svg-width "width"
-                            cursor-pos "cursor-pos"
-                            svg-shift "shift-x"
-                            data "data"
-                            svg-scale "scale"
-                            svg-piano-roll "piano-roll"
-                            svg-staff-systems "staff-systems"
-                            svg-bar-lines "bar-lines")
-   :svg "/html-display.svg")
+  (let (transport-toggle)
+    (setf (clog:title (clog:html-document body)) "SVG Test")
+    (create-o-svg
+     body (bind-refs-to-attrs svg-width "width"
+                              cursor-pos "cursor-pos"
+                              svg-shift "shift-x"
+                              data "data"
+                              svg-scale "scale"
+                              svg-piano-roll "piano-roll"
+                              svg-staff-systems "staff-systems"
+                              svg-bar-lines "bar-lines")
+     :svg "/html-display.svg")
 ;;;  (create-o-radio body (bind-refs-to-attrs idx "value") :css '(:width "6em") :labels (list (loop for idx from 1 to 6 collect idx)) :num 6)
-  (create-o-slider body (bind-refs-to-attrs svg-shift "value" svg-width "max")
-                   :min 0 :max 200 :direction :right
-                   :css `(:display "inline-block" :height "1em" :width "100%"))
-  (create-o-toggle body (bind-refs-to-attrs transport "value")
-                   :label '("play" "stop") :background '("transparent" "#8f8")
-                   :css `(:display "inline-block" :height "1.2em" :width "3em"))
-  (create-o-toggle body (bind-refs-to-attrs auto-return "value")
-                   :label '("rtn") :css `(:display "inline-block" :height "1.2em" :width "3em"))
-  (create-o-toggle body (bind-refs-to-attrs svg-piano-roll "value")
-                   :label '("pno") :css `(:display "inline-block" :height "1.2em" :width "3em"))
-  (create-o-toggle body (bind-refs-to-attrs svg-staff-systems "value")
-                   :label '("stf") :css `(:display "inline-block" :height "1.2em" :width "3em"))
-  (create-o-toggle body (bind-refs-to-attrs svg-bar-lines "value")
-                   :label '("bar") :css `(:display "inline-block" :height "1.2em" :width "3em")))
+    (create-o-slider body (bind-refs-to-attrs svg-shift "value" svg-width "max")
+                     :min 0 :max 200 :direction :right
+                     :css `(:display "inline-block" :height "1em" :width "100%"))
+    (setf transport-toggle
+          (create-o-toggle body (bind-refs-to-attrs transport "value")
+                           :label '("play" "stop") :background '("transparent" "#8f8")
+                           :css `(:display "inline-block" :height "1.2em" :width "3em")))
+    (create-o-toggle body (bind-refs-to-attrs auto-return "value")
+                     :label '("rtn") :css `(:display "inline-block" :height "1.2em" :width "3em"))
+    (create-o-toggle body (bind-refs-to-attrs svg-piano-roll "value")
+                     :label '("pno") :css `(:display "inline-block" :height "1.2em" :width "3em"))
+    (create-o-toggle body (bind-refs-to-attrs svg-staff-systems "value")
+                     :label '("stf") :css `(:display "inline-block" :height "1.2em" :width "3em"))
+    (create-o-toggle body (bind-refs-to-attrs svg-bar-lines "value")
+                     :label '("bar") :css `(:display "inline-block" :height "1.2em" :width "3em"))
+    (set-keyboard-shortcuts body transport-toggle)))
+
+
 
 (defun on-new-window (body)
   (new-window body))
@@ -235,6 +259,23 @@
 ;; (set-val svg-scale 9.5)
 
 ;;; (set-val svg-timescale 0.125) 
+
+
+(defun install-key-shortcuts (container vu-id preset-panel-id)
+  (js-execute
+   container
+   (format nil "document.onkeydown = function (event) {
+  if (event.which == 112 || event.keyCode == 112) {
+   document.getElementById('~a').style.display = \"flex\";
+   document.getElementById('~a').style.display = \"none\";
+  }
+  if (event.which == 113 || event.keyCode == 113) {
+   document.getElementById('~a').style.display = \"none\";
+   document.getElementById('~a').style.display = \"block\";
+  }
+};
+" vu-id preset-panel-id vu-id preset-panel-id)))
+
 
 (defun svg-play ()
   (labels ((inner (time)

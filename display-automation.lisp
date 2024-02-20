@@ -47,18 +47,9 @@
   (setf *curr-voices* nil))
 |#
 
-(defun trim-region (obj &optional (start 0) end)
-  (let ((seq (sort (if (typep obj 'cm::container) (subobjects obj) obj)
-                   #'< :key #'object-time)))
-    (loop until (or (not seq) (>= (object-time (first seq)) start))
-          do (setf seq (cdr seq)))
-    (loop
-      with start-offs = (object-time (first seq))
-      for x in seq
-      if (or (not end) (<= (object-time x) end)) collect
-                                                 (let ((new (copy-object x)))
-                                                   (decf (object-time new) start-offs)
-                                                   new))))
+(defun get-timescale (&rest tempo)
+  "calc svg timescale from tempo"
+  (/ 15/4 (apply #'* tempo)))
 
 (defun seq-play (obj)
   (let* ((evts (subobjects obj))
@@ -68,10 +59,17 @@
         (progn
           (let ((curr-pos (get-val svg-shift)))
             (dolist (obj evts)
-              (when (>= (object-time obj) curr-pos)
+              (when (>= (+ (object-time obj) (sv obj :duration)) curr-pos)
                 (let ((obj (copy-object obj)))
-                  (setf (sv obj :time) (float (* (get-val svg-timescale) (- (sv obj :time) curr-pos))))
-                  (sv* obj :duration (get-val svg-timescale))
+                  (if (< (object-time obj) curr-pos)
+                      (progn
+                        (setf (sv obj :duration) (* (get-val svg-timescale)
+                                                    (- (sv obj duration)
+                                                       (- curr-pos (object-time obj)))))
+                        (setf (sv obj :time) 0))
+                      (progn
+                        (setf (sv obj :time) (float (* (get-val svg-timescale) (- (sv obj :time) curr-pos))))
+                        (sv* obj :duration (get-val svg-timescale))))
 ;;;                  (format t "~a~%" obj)
                   (sprout obj))
                 )
@@ -80,25 +78,6 @@
           ))))
 
 (defmacro sv- (obj slot val &body more) (svaux obj '- slot val more))
-
-(seq-play (find-object "hdbg04q-sfz-seq"))
-
-
-2481.235
-
-(set-val svg-timescale 1/8)
-
-(let ((evts (sort (mapcar #'copy-object (subobjects (get-val svg-seq))) #'< :key #'object-time)))
-  (setf (object-time (first evts)) 1000)
-  evts
-  )
-
-
-(sort (copy-tree (subobjects (get-val svg-seq))) #'< :key #'object-time)
-
-(region-play (get-val svg-seq) :timescale 15 :region (list (get-val svg-shift) nil))
-
-;;; (use-package :clog)
 
 (progn
   (defparameter cursor-pos nil)
@@ -126,7 +105,7 @@
   (setf svg-seq (make-ref nil))
   (setf svg-width (make-ref 0))
   (setf svg-scale (make-ref 9.5))
-  (setf svg-timescale (make-ref 1/8))
+  (setf svg-timescale (make-ref (get-timescale 1/4 96)))
   (setf svg-piano-roll (make-ref 1))
   (setf svg-staff-systems (make-ref 1))
   (setf svg-bar-lines (make-ref 1))
@@ -136,13 +115,13 @@
   (setf play-watch (watch (let ((last-pos 0))
                             (lambda () (if (zerop (get-val transport))
                                       (let (cl-refs::*curr-ref*)
-                                        (format t "stopping~%")
+;;                                        (format t "stopping~%")
                                         (incudine:node-free-all)
                                         (incudine:flush-pending)
                                         (unless (zerop (get-val auto-return))
                                           (set-val svg-shift last-pos )))
                                       (let (cl-refs::*curr-ref*)
-                                        (format t "relocating~%")
+;;                                        (format t "relocating~%")
                                         (setf last-pos (get-val svg-shift))
                                         (seq-play (get-val svg-seq))
                                         (svg-play)
@@ -161,6 +140,14 @@
                                        (setf (container-subobjects seq) (sort (subobjects seq) #'< :key #'object-time))
                                        seq)))))
   nil)
+
+;;; (find-object "hdbg04q-sfz-seq")
+
+4 = 1 Schlag bei 1/4
+
+
+
+(set-val svg-timescale (get-timescale 1/4 60))
 
 
 
@@ -280,10 +267,15 @@
   (labels ((inner (time)
              (unless (zerop (get-val transport))
                (when (> (get-val svg-shift) (get-val svg-width)) (set-val transport 0))
-               (set-val svg-shift (+ (get-val svg-shift) (* 1.067 (float (get-val svg-timescale)))))
+               (set-val svg-shift (+ (get-val svg-shift) (* 1.067 (float (/ 1/64 (get-val svg-timescale))))))
                  (let ((next (+ time 1/60)))
                    (cm:at next #'inner next)))))
     (inner (cm:now))))
+
+(set-val svg-timescale 1/16) (/ 1/8)
+
+
+
 ;;;(funcall my-watch)
 
 
@@ -294,6 +286,8 @@
 (set-val svg-bar-lines 0)
 (set-val svg-staff-systems 0)
 
+(set-val svg-timescale 0.125)
+(set-val svg-timescale 0.25)
 (get-val svg-width)
 
 (progn
@@ -314,3 +308,9 @@
 60 .. -60 bei 100%
 
 |#
+
+(/ 15 (apply #'* '(1 60)))
+
+()
+
+(beat->time 2 :factor )

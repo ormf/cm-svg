@@ -2,7 +2,7 @@
 ;;; display-automation.lisp
 ;;;
 ;;; **********************************************************************
-;;; Copyright (c) 2022 Orm Finnendahl <orm.finnendahl@selma.hfmdk-frankfurt.de>
+;;; Copyright (c) 2022-24 Orm Finnendahl <orm.finnendahl@selma.hfmdk-frankfurt.de>
 ;;;
 ;;; Revision history: See git repository.
 ;;;
@@ -17,6 +17,34 @@
 ;;; GNU General Public License for more details.
 ;;;
 ;;; **********************************************************************
+
+(in-package :cl-user)
+
+(defpackage #:cm.svgd
+  (:use #:cl)
+  (:export #:shift #:cursor-pos #:width #:scale #:seq #:inverse #:timescale
+           #:piano-roll #:staff-systems #:bar-lines #:idx #:data
+           #:transport #:auto-return #:play-watch #:data-watch))
+
+(in-package :cm.svgd)
+
+(defparameter cursor-pos nil)
+(defparameter shift nil)
+(defparameter width nil)
+(defparameter scale nil)
+(defparameter seq nil)
+(defparameter inverse nil)
+(defparameter timescale nil)
+(defparameter piano-roll nil)
+(defparameter staff-systems nil)
+(defparameter bar-lines nil)
+(defparameter idx nil)
+(defparameter data nil)
+(defparameter transport nil)
+(defparameter auto-return (cl-refs:make-ref 0))
+(defparameter play-watch nil)
+(defparameter data-watch nil)
+
 
 (in-package :cm)
 
@@ -51,109 +79,138 @@
   "calc svg timescale from tempo"
   (/ 15/4 (apply #'* tempo)))
 
+(defun object-end (obj)
+  (typecase obj
+    (poolevt
+     (let* ((end (sv obj :end))
+            (buffer (of-incudine-dsps:lsample-buffer (sv obj :lsample)))
+            (bufdur (float (/ (incudine::buffer-frames buffer)
+                              (incudine::buffer-sample-rate buffer))
+                           1.0)))
+       (+ (object-time obj) (if (zerop end) bufdur (min end bufdur)))))
+    (t (+ (object-time obj) (sv obj :duration)))))
+
+(defun trim-start (obj curr-pos obj-end)
+  (typecase obj
+    (poolevt
+     (setf (sv obj :start) (/ (- curr-pos (object-time obj)) (sv obj :stretch)))
+     (sv* obj :stretch (get-val cm.svgd:timescale)))
+    (t (setf (sv obj :duration)
+             (* (get-val cm.svgd:timescale) (- obj-end curr-pos)))))
+;;  (break "~a" obj)
+  (values))
+
 (defun seq-play (obj)
   (let* ((evts (subobjects obj))
 ;;;         (offs (get-first-in-region evts region timescale))
          )
-    (if evts
+    (if evts 
         (progn
-          (let ((curr-pos (get-val svg-shift)))
+          (let ((curr-pos (get-val cm.svgd:shift)))
             (dolist (obj evts)
-              (let ((obj-end (+ (object-time obj) (sv obj :duration))))
+              (let ((obj-end (object-end obj)))
                 (when (>= obj-end curr-pos)
                   (let ((obj (copy-object obj)))
                     (if (< (object-time obj) curr-pos)
                         (progn
-                          (setf (sv obj :duration) (* (get-val svg-timescale) (- obj-end curr-pos)))
+                          (trim-start obj curr-pos obj-end)
                           (setf (sv obj :time) 0))
                         (progn
-                          (setf (sv obj :time) (float (* (get-val svg-timescale) (- (sv obj :time) curr-pos))))
-                          (sv* obj :duration (get-val svg-timescale))))
-;;;                  (format t "~a~%" obj)
+                          (setf (sv obj :time)
+                                (float (* (get-val cm.svgd:timescale)
+                                          (- (sv obj :time) curr-pos))))
+                          (typecase obj
+                            (poolevt (sv* obj :stretch (get-val cm.svgd:timescale)))
+                            (t (sv* obj :duration (get-val cm.svgd:timescale))))))
+;;;                    (format t "~a~%" obj)
                     (sprout obj))
                   ))
               ))
           ;;          (browser-play (* offs 6.041) :tscale (/ 1/8 6.041))
           ))))
 
+#|
+(sv (new poolevt) :lsample)
+
+
+
+
+#i(poolevt time 90.7 lsample #S(of-incudine-dsps:lsample
+                                :filename "/home/orm/work/kompositionen/letzte-worte/snd/samples/fl-s01-line10.wav"
+                                :buffer #<incudine:buffer :FRAMES 469921 :CHANNELS 2 :SR 48000.0>
+                                :play-fn nil
+                                :keynum 62.599998474121094d0
+                                :loopstart 0.0d0
+                                :amp 0.0d0
+                                :loopend 0.0d0
+                                :id nil) keynum 62.6 amp 0.5 dy -4.6 start 0 end 0 stretch 4.9999890481924085d0 wwidth 123 attack 0 release 0.01 pan 0.5 snd-id 6 adjust-stretch nil out1 0 out2 1).
+[Condition of type sb-pcl::missing-slot]
+|#
+
+
 (defmacro sv- (obj slot val &body more) (svaux obj '- slot val more))
 
 (progn
-  (defparameter cursor-pos nil)
-  (defparameter svg-shift nil)
-  (defparameter svg-width nil)
-  (defparameter svg-scale nil)
-  (defparameter svg-seq nil)
-  (defparameter svg-timescale nil)
-  (defparameter svg-piano-roll nil)
-  (defparameter svg-staff-systems nil)
-  (defparameter svg-bar-lines nil)
-  (defparameter idx nil)
-  (defparameter data nil)
-  (defparameter transport nil)
-  (defparameter auto-return (make-ref 0))
-  (defparameter play-watch nil)
-  (defparameter data-watch nil))
-
-(progn
   (clear-bindings)
-  (when play-watch (funcall play-watch))
-  (when data-watch (funcall data-watch))
-  (setf cursor-pos (make-ref 0.5))
-  (setf svg-shift (make-ref 0))
-  (setf svg-seq (make-ref nil))
-  (setf svg-width (make-ref 0))
-  (setf svg-scale (make-ref 9.5))
-  (setf svg-timescale (make-ref (get-timescale 1/4 96)))
-  (setf svg-piano-roll (make-ref 1))
-  (setf svg-staff-systems (make-ref 1))
-  (setf svg-bar-lines (make-ref 1))
-  (setf idx (make-ref 0))
-  (setf transport (make-ref 0))
-  (setf data (make-ref "hdbg04q-sfz.svg"))
-  (setf play-watch (watch (let ((last-pos 0))
-                            (lambda () (if (zerop (get-val transport))
+  (when cm.svgd:play-watch (funcall cm.svgd:play-watch))
+  (when cm.svgd:data-watch (funcall cm.svgd:data-watch))
+  (setf cm.svgd:cursor-pos (make-ref 0.5))
+  (setf cm.svgd:inverse (make-ref 0))
+  (setf cm.svgd:shift (make-ref 0))
+  (setf cm.svgd:seq (make-ref nil))
+  (setf cm.svgd:width (make-ref 0))
+  (setf cm.svgd:scale (make-ref 9.5))
+  (setf cm.svgd:timescale (make-ref (get-timescale 1/4 96)))
+  (setf cm.svgd:piano-roll (make-ref 1))
+  (setf cm.svgd:staff-systems (make-ref 1))
+  (setf cm.svgd:bar-lines (make-ref 1))
+  (setf cm.svgd:idx (make-ref 0))
+  (setf cm.svgd:transport (make-ref 0))
+  (setf cm.svgd:data (make-ref "hdbg04q-sfz.svg"))
+  (setf cm.svgd:play-watch (watch (let ((last-pos 0))
+                            (lambda () (if (zerop (get-val cm.svgd:transport))
                                       (let (cl-refs::*curr-ref*)
 ;;                                        (format t "stopping~%")
                                         (incudine:node-free-all)
                                         (incudine:flush-pending)
-                                        (unless (zerop (get-val auto-return))
-                                          (set-val svg-shift last-pos )))
+                                        (unless (zerop (get-val cm.svgd:auto-return))
+                                          (set-val cm.svgd:shift last-pos )))
                                       (let (cl-refs::*curr-ref*)
 ;;                                        (format t "relocating~%")
-                                        (setf last-pos (get-val svg-shift))
-                                        (seq-play (get-val svg-seq))
+                                        (setf last-pos (get-val cm.svgd:shift))
+                                        (seq-play (get-val cm.svgd:seq))
                                         (svg-play)
 
 ))))))
-  (setf data-watch (watch (lambda ()
+  (setf cm.svgd:data-watch (watch (lambda ()
 ;;;                            (format t "reset-seq")
-                            (set-val svg-seq
-                                     (let ((seq
-                                             (cm:import-events
-                                              (namestring
-                                               (merge-pathnames
-                                                (format nil "www/~A" (get-val data))
-                                                (asdf:system-source-directory :clog-dsp-widgets)))
-                                              :x-scale 1)))
-                                       (setf (container-subobjects seq) (sort (subobjects seq) #'< :key #'object-time))
-                                       seq)))))
+                                    (set-val cm.svgd:seq
+                                             (let ((seq
+                                                     (cm:import-events
+                                                      (namestring
+                                                       (merge-pathnames
+                                                        (format nil "www/~A" (get-val cm.svgd:data))
+                                                        (asdf:system-source-directory :clog-dsp-widgets)))
+                                                      :x-scale 1)))
+                                               (when seq
+                                                 (setf (container-subobjects seq) (sort (subobjects seq) #'< :key #'object-time)))
+                                               seq)))))
   nil)
 
 ;;; (find-object "hdbg04q-sfz-seq")
 
 
 
-;;; (get-val svg-seq)
+;;; (get-val cm.svgd:seq)
 ;;; (set-val svg-timescale 1)
 
 
 
-;;, (set-val data "hdbg04b-sfz.svg")
-(set-val data "hdbg04q-sfz.svg")
-;;; (set-val svg-scale 9.5)
-;;; (get-val svg-seq)
-;;; (get-val svg-width)
+;;, (set-val cm.svgd:data "hdbg04b-sfz.svg")
+(set-val cm.svgd:data "hdbg04q-sfz.svg")
+;;; (set-val cm.svgd:scale 9.5)
+;;; (get-val cm.svgd:seq)
+;;; (get-val cm.svgd:width)
 
 (defun set-keyboard-shortcuts (container transport-toggle)
   (clog:js-execute
@@ -179,34 +236,35 @@
   (let (transport-toggle)
     (setf (clog:title (clog:html-document body)) "SVG Test")
     (create-o-svg
-     body (bind-refs-to-attrs svg-width "width"
-                              cursor-pos "cursor-pos"
-                              svg-shift "shift-x"
-                              data "data"
-                              svg-scale "scale"
-                              svg-piano-roll "piano-roll"
-                              svg-staff-systems "staff-systems"
-                              svg-bar-lines "bar-lines"))
-    (create-o-slider body (bind-refs-to-attrs svg-shift "value" svg-width "max")
+     body (bind-refs-to-attrs cm.svgd:width "width"
+                              cm.svgd:cursor-pos "cursor-pos"
+                              cm.svgd:shift "shift-x"
+                              cm.svgd:data "data"
+                              cm.svgd:scale "scale"
+                              cm.svgd:piano-roll "piano-roll"
+                              cm.svgd:staff-systems "staff-systems"
+                              cm.svgd:bar-lines "bar-lines"
+                              cm.svgd:inverse "inverse"))
+    (create-o-slider body (bind-refs-to-attrs cm.svgd:shift "value" cm.svgd:width "max")
                      :min 0 :max 200 :direction :right
                      :css `(:display "inline-block" :height "1em" :width "100%"))
     (setf transport-toggle
-          (create-o-toggle body (bind-refs-to-attrs transport "value")
+          (create-o-toggle body (bind-refs-to-attrs cm.svgd:transport "value")
                            :label '("play" "stop") :background '("transparent" "#8f8")
                            :css `(:display "inline-block" :height "1.2em" :width "3em")))
-    (create-o-toggle body (bind-refs-to-attrs auto-return "value")
+    (create-o-toggle body (bind-refs-to-attrs cm.svgd:auto-return "value")
                      :label '("rtn") :css `(:display "inline-block" :height "1.2em" :width "3em"))
-    (create-o-toggle body (bind-refs-to-attrs svg-piano-roll "value")
+    (create-o-toggle body (bind-refs-to-attrs cm.svgd:piano-roll "value")
                      :label '("pno") :css `(:display "inline-block" :height "1.2em" :width "3em"))
-    (create-o-toggle body (bind-refs-to-attrs svg-staff-systems "value")
+    (create-o-toggle body (bind-refs-to-attrs cm.svgd:staff-systems "value")
                      :label '("stf") :css `(:display "inline-block" :height "1.2em" :width "3em"))
-    (create-o-toggle body (bind-refs-to-attrs svg-bar-lines "value")
+    (create-o-toggle body (bind-refs-to-attrs cm.svgd:bar-lines "value")
                      :label '("bar") :css `(:display "inline-block" :height "1.2em" :width "3em"))
     (set-keyboard-shortcuts body transport-toggle)
     ))
 
 
-
+(set-val cm.svgd:shift 10)
 (defun on-new-window (body)
   (new-window body))
 
@@ -237,27 +295,12 @@
 ;;; (set-val svg-timescale 0.125) 
 
 
-(defun install-key-shortcuts (container vu-id preset-panel-id)
-  (js-execute
-   container
-   (format nil "document.onkeydown = function (event) {
-  if (event.which == 112 || event.keyCode == 112) {
-   document.getElementById('~a').style.display = \"flex\";
-   document.getElementById('~a').style.display = \"none\";
-  }
-  if (event.which == 113 || event.keyCode == 113) {
-   document.getElementById('~a').style.display = \"none\";
-   document.getElementById('~a').style.display = \"block\";
-  }
-};
-" vu-id preset-panel-id vu-id preset-panel-id)))
-
-
 (defun svg-play ()
   (labels ((inner (time)
-             (unless (zerop (get-val transport))
-               (when (> (get-val svg-shift) (+ 2 (get-val svg-width))) (set-val transport 0))
-               (set-val svg-shift (+ (get-val svg-shift) (* 1.067 (float (/ 1/64 (get-val svg-timescale))))))
+             (unless (zerop (get-val cm.svgd:transport))
+               (when (> (get-val cm.svgd:shift) (+ 2 (get-val cm.svgd:width))) (set-val cm.svgd:transport 0))
+               (set-val cm.svgd:shift (+ (get-val cm.svgd:shift)
+                                         (* 1.067(float (/ 1/64 (get-val cm.svgd:timescale))))))
                  (let ((next (+ time 1/60)))
                    (cm:at next #'inner next)))))
     (inner (cm:now))))
@@ -267,36 +310,18 @@
 
 #|
 
-(set-val svg-piano-roll 0)
-(set-val svg-scale 9.5)
-(set-val svg-bar-lines 0)
-(set-val svg-staff-systems 0)
+(set-val cm.svgd:piano-roll 0)
+(set-val cm.svgd:scale 9.5)
+(set-val cm.svgd:bar-lines 0)
+(set-val cm.svgd:staff-systems 0)
 
-(set-val svg-timescale 0.125)
-(set-val svg-timescale 0.25)
-(get-val svg-width)
+(set-val cm.svgd:timescale 0.125)
+(set-val cm.svgd:timescale 0.25)
+(get-val cm.svgd:width)
 
 (progn
- (set-val cursor-pos 0.2)
- (set-val cursor-pos 0.5))
+ (set-val cm.svgd:cursor-pos 0.2)
+ (set-val cm.svgd:cursor-pos 0.5))
 ;;; (ql:quickload '(clack websocket-driver alexandria cm-all))
 
-
-1000% - 1094
-500% - 517
-100% 60 .. -60
-200% 60 .. -180
-300% 60 .. -300
-400& 60 .. -420
-
-(- (* 2 (+ 517 60)) 60)
-
-60 .. -60 bei 100%
-
 |#
-
-(/ 15 (apply #'* '(1 60)))
-
-()
-
-(beat->time 2 :factor )

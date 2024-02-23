@@ -87,7 +87,7 @@
             (bufdur (float (/ (incudine::buffer-frames buffer)
                               (incudine::buffer-sample-rate buffer))
                            1.0)))
-       (+ (object-time obj) (if (zerop end) bufdur (min end bufdur)))))
+       (+ (object-time obj) (* (sv obj :stretch) (if (zerop end) bufdur (min end bufdur))))))
     (t (+ (object-time obj) (sv obj :duration)))))
 
 (defun trim-start (obj curr-pos obj-end)

@@ -1,4 +1,4 @@
-(;;; 
+;;; 
 ;;; browser-play.lisp
 ;;;
 ;;; **********************************************************************
@@ -18,7 +18,7 @@
 ;;;
 ;;; **********************************************************************
 
- in-package :cm-svg)
+(in-package :cm)
 
 (defun trim-region (obj &optional (start 0) end)
   (let ((seq (sort (if (typep obj 'cm::container) (subobjects obj) obj)

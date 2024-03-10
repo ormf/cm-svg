@@ -52,6 +52,6 @@
      (setf ,osc-conn nil)))
 
  ;;; (stop-inkscape-osc)
-(start-inkscape-osc)
+;;; (start-inkscape-osc)
 
 (export '(*osc-inkscape-export-in* start-inkscape-osc stop-inkscape-osc) :cm)

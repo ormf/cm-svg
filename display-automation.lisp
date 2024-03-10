@@ -24,7 +24,7 @@
   (:use #:cl)
   (:export #:shift #:cursor-pos #:width #:scale #:seq #:inverse #:timescale
            #:piano-roll #:staff-systems #:bar-lines #:idx #:data
-           #:transport #:auto-return #:play-watch #:data-watch))
+           #:transport #:auto-return #:play-watch #:data-watch #:timescale-watch))
 
 (in-package :cm.svgd)
 
@@ -43,6 +43,7 @@
 (defparameter transport nil)
 (defparameter auto-return (cl-refs:make-ref 0))
 (defparameter play-watch nil)
+(defparameter timescale-watch nil)
 (defparameter data-watch nil)
 
 
@@ -166,7 +167,8 @@
   (setf cm.svgd:bar-lines (make-ref 1))
   (setf cm.svgd:idx (make-ref 0))
   (setf cm.svgd:transport (make-ref 0))
-  (setf cm.svgd:data (make-ref "hdbg04q-sfz.svg"))
+  (setf cm.svgd:data (make-ref ""))
+  #|
   (setf cm.svgd:play-watch (watch (let ((last-pos 0))
                             (lambda () (if (zerop (get-val cm.svgd:transport))
                                       (let (cl-refs::*curr-ref*)
@@ -194,7 +196,8 @@
                                                       :x-scale 1)))
                                                (when seq
                                                  (setf (container-subobjects seq) (sort (subobjects seq) #'< :key #'object-time)))
-                                               seq)))))
+  seq)))))
+  |#
   nil)
 
 ;;; (find-object "hdbg04q-sfz-seq")
@@ -231,7 +234,7 @@
 "
            (clog:html-id transport-toggle))))
 
-(defun new-window (body)
+(defun svg-display (body)
   "On-new-window handler."
   (let (transport-toggle)
     (setf (clog:title (clog:html-document body)) "SVG Test")
@@ -263,10 +266,7 @@
     (set-keyboard-shortcuts body transport-toggle)
     ))
 
-
-(set-val cm.svgd:shift 10)
-(defun on-new-window (body)
-  (new-window body))
+(clog:set-on-new-window 'svg-display :path "/svg-display" :boot-file "/start.html")
 
 ;; Initialize the CLOG system with a boot file which contains the
 ;; static js files. For customized uses copy the "www" subdirectory of
@@ -279,7 +279,7 @@
               :static-root static-root
               :boot-file "/start.html")
   ;; Open a browser to http://127.0.0.1:8080 - the default for CLOG apps
-  (clog:set-on-new-window  #'on-new-window :path "/svg-display" :boot-file "/start.html")
+  (clog:set-on-new-window  'svg-display :path "/svg-display" :boot-file "/start.html")
   (clog:open-browser :url "http://127.0.0.1:8080/svg-display"))
 
 ;;; (start) should start a webserver with some gui widgets that are
@@ -300,7 +300,7 @@
              (unless (zerop (get-val cm.svgd:transport))
                (when (> (get-val cm.svgd:shift) (+ 2 (get-val cm.svgd:width))) (set-val cm.svgd:transport 0))
                (set-val cm.svgd:shift (+ (get-val cm.svgd:shift)
-                                         (* 1.067(float (/ 1/64 (get-val cm.svgd:timescale))))))
+                                         (* 1.067 (float (/ 1/64 (get-val cm.svgd:timescale))))))
                  (let ((next (+ time 1/60)))
                    (cm:at next #'inner next)))))
     (inner (cm:now))))

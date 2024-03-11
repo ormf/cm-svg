@@ -55,7 +55,7 @@
   "wrapper function for mapping."
   (apply #'make-instance 'svg-cm-line args))
 
-(defun get-path-coords (node parse-state &key (x-offset 0) (timescale 1) (xquantize nil) (yquantize nil))
+(defun get-svg-cm-line (node parse-state &key (x-offset 0) (timescale 1) (xquantize nil) (yquantize nil))
   "return an svg-cm-line instance from path node."
   (let* ((path (parse-path2 (cxml-stp:value (cxml-stp:find-attribute-named node "d"))))
          (style-string (cxml-stp:value (cxml-stp:find-attribute-named node "style")))
@@ -94,6 +94,46 @@
                            (read-from-string (format nil "(~a)" (quote-svg-attr-props attributes))))
            ))
         (warn "~a is empty!" (cxml-stp:value (cxml-stp:find-attribute-named node "id"))))))
+
+;;; this has already been defined in svg-import-export, but needs to be redefined here to accept svg-cm-line instances
+
+(defun svg-collect-lines (layer parse-state &key (timescale 1) (x-offset 0) (xquantize nil) (yquantize nil) layer?)
+  "return a list of svg-cm-line instances of layer with a given parse-state."
+  (let ((result '()))
+    (if (and layer (visible? layer))
+        (progn
+          (cxml-stp:map-children
+           'list
+           (lambda (child)
+             (cond
+               ((and layer? (layer? child) (visible? child))
+                (let ((inner-parse-state (update-state (copy-svg-parse-state parse-state) child)))
+                  (let ((name (layer-name child))
+                        (res (svg-collect-lines child inner-parse-state
+                                            :x-offset x-offset
+                                            :timescale timescale
+                                            :xquantize xquantize
+                                            :yquantize yquantize
+                                            :layer? layer?)))
+                    (if res (setf result (append (list (list :layer name :contents res)) result))))))
+               ((and (group? child) (visible? child))
+                (let ((inner-parse-state (update-state (copy-svg-parse-state parse-state) child)))
+                  (let ((res (svg-collect-lines child inner-parse-state
+                                            :x-offset x-offset
+                                            :timescale timescale
+                                            :xquantize xquantize
+                                            :yquantize yquantize
+                                            :layer? layer?)))
+                    (if res (push res result)))))
+               ((path? child) (ou:push-if
+                               (get-svg-cm-line child parse-state
+                                                :xquantize xquantize
+                                                :yquantize yquantize
+                                                :x-offset x-offset
+                                                :timescale timescale)
+                               result))))
+           layer)
+          (reverse result)))))
 
 (export
  '(MAKE-CM-LINE

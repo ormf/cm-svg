@@ -25,3 +25,4 @@
 ;;; (shadowing-import '(start) 'clog-dsp-widgets)
 (use-package '(#:cl-refs #:clog-dsp-widgets))
 
+(export '(svg-display svg->browser) 'cm)

@@ -42,13 +42,14 @@
 ;;;                           (format t "~&~S~%~%" cl-user::*tmpsnd*)
                                         )
                                       )
-         (incudine:recv-start ,osc-conn))
+         (incudine:recv-start ,osc-conn)
+         :inkscape-osc-rcv-started)
        (warn "port 1337 already open!")))
 
 (defmacro stop-inkscape-osc (&optional (osc-conn '*osc-inkscape-export-in*))
   `(progn
-     (remove-all-responders ,osc-conn)
-     (incudine.osc:close ,osc-conn)
+     (incudine:remove-all-responders ,osc-conn)
+     (if ,osc-conn (incudine.osc:close ,osc-conn))
      (setf ,osc-conn nil)))
 
  ;;; (stop-inkscape-osc)

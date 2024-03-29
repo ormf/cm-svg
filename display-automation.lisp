@@ -23,8 +23,9 @@
 (defpackage #:cm.svgd
   (:use #:cl)
   (:export #:shift #:cursor-pos #:width #:scale #:seq #:inverse #:timescale
-           #:piano-roll #:staff-systems #:bar-lines #:idx #:data
-           #:transport #:auto-return #:play-watch #:data-watch #:timescale-watch))
+           #:piano-roll #:staff-systems #:bar-lines #:idx #:data #:svg-file
+           #:transport #:auto-return #:play-watch #:data-watch #:timescale-watch
+           #:svg-dir #:*play-hooks* #:*stop-hooks*))
 
 (in-package :cm.svgd)
 
@@ -39,13 +40,16 @@
 (defparameter staff-systems nil)
 (defparameter bar-lines nil)
 (defparameter idx nil)
-(defparameter data nil)
+(defparameter svg-file nil)
 (defparameter transport nil)
 (defparameter auto-return (cl-refs:make-ref 0))
 (defparameter play-watch nil)
 (defparameter timescale-watch nil)
 (defparameter data-watch nil)
+(defparameter svg-dir nil)
 
+(defparameter *play-hooks* nil)
+(defparameter *stop-hooks* nil)
 
 (in-package :cm)
 
@@ -107,6 +111,7 @@
          )
     (if evts 
         (progn
+          (dolist (hook cm.svgd:*play-hooks*) (funcall hook))
           (let ((curr-pos (get-val cm.svgd:shift)))
             (dolist (obj evts)
               (let ((obj-end (object-end obj)))
@@ -130,28 +135,10 @@
           ;;          (browser-play (* offs 6.041) :tscale (/ 1/8 6.041))
           ))))
 
-#|
-(sv (new poolevt) :lsample)
-
-
-
-
-#i(poolevt time 90.7 lsample #S(of-incudine-dsps:lsample
-                                :filename "/home/orm/work/kompositionen/letzte-worte/snd/samples/fl-s01-line10.wav"
-                                :buffer #<incudine:buffer :FRAMES 469921 :CHANNELS 2 :SR 48000.0>
-                                :play-fn nil
-                                :keynum 62.599998474121094d0
-                                :loopstart 0.0d0
-                                :amp 0.0d0
-                                :loopend 0.0d0
-                                :id nil) keynum 62.6 amp 0.5 dy -4.6 start 0 end 0 stretch 4.9999890481924085d0 wwidth 123 attack 0 release 0.01 pan 0.5 snd-id 6 adjust-stretch nil out1 0 out2 1).
-[Condition of type sb-pcl::missing-slot]
-|#
-
-
 (defmacro sv- (obj slot val &body more) (svaux obj '- slot val more))
 
-(progn
+(defun init-svg-display ()
+  "(re)initalize all ref-objects."
   (clear-bindings)
   (when cm.svgd:play-watch (funcall cm.svgd:play-watch))
   (when cm.svgd:data-watch (funcall cm.svgd:data-watch))
@@ -167,53 +154,8 @@
   (setf cm.svgd:bar-lines (make-ref 1))
   (setf cm.svgd:idx (make-ref 0))
   (setf cm.svgd:transport (make-ref 0))
-  (setf cm.svgd:data (make-ref ""))
-  #|
-  (setf cm.svgd:play-watch (watch (let ((last-pos 0))
-                            (lambda () (if (zerop (get-val cm.svgd:transport))
-                                      (let (cl-refs::*curr-ref*)
-;;                                        (format t "stopping~%")
-                                        (incudine:node-free-all)
-                                        (incudine:flush-pending)
-                                        (unless (zerop (get-val cm.svgd:auto-return))
-                                          (set-val cm.svgd:shift last-pos )))
-                                      (let (cl-refs::*curr-ref*)
-;;                                        (format t "relocating~%")
-                                        (setf last-pos (get-val cm.svgd:shift))
-                                        (seq-play (get-val cm.svgd:seq))
-                                        (svg-play)
-
-))))))
-  (setf cm.svgd:data-watch (watch (lambda ()
-;;;                            (format t "reset-seq")
-                                    (set-val cm.svgd:seq
-                                             (let ((seq
-                                                     (cm:import-events
-                                                      (namestring
-                                                       (merge-pathnames
-                                                        (format nil "www/~A" (get-val cm.svgd:data))
-                                                        (asdf:system-source-directory :clog-dsp-widgets)))
-                                                      :x-scale 1)))
-                                               (when seq
-                                                 (setf (container-subobjects seq) (sort (subobjects seq) #'< :key #'object-time)))
-  seq)))))
-  |#
+  (setf cm.svgd:svg-file (make-ref ""))
   nil)
-
-;;; (find-object "hdbg04q-sfz-seq")
-
-
-
-;;; (get-val cm.svgd:seq)
-;;; (set-val svg-timescale 1)
-
-
-
-;;, (set-val cm.svgd:data "hdbg04b-sfz.svg")
-(set-val cm.svgd:data "hdbg04q-sfz.svg")
-;;; (set-val cm.svgd:scale 9.5)
-;;; (get-val cm.svgd:seq)
-;;; (get-val cm.svgd:width)
 
 (defun set-keyboard-shortcuts (container transport-toggle)
   (clog:js-execute
@@ -237,12 +179,12 @@
 (defun svg-display (body)
   "On-new-window handler."
   (let (transport-toggle)
-    (setf (clog:title (clog:html-document body)) "SVG Test")
+    (setf (clog:title (clog:html-document body)) "SVG Player")
     (create-o-svg
      body (bind-refs-to-attrs cm.svgd:width "width"
                               cm.svgd:cursor-pos "cursor-pos"
                               cm.svgd:shift "shift-x"
-                              cm.svgd:data "data"
+                              cm.svgd:svg-file "svg-file"
                               cm.svgd:scale "scale"
                               cm.svgd:piano-roll "piano-roll"
                               cm.svgd:staff-systems "staff-systems"
@@ -294,7 +236,6 @@
 
 ;;; (set-val svg-timescale 0.125) 
 
-
 (defun svg-play ()
   (labels ((inner (time)
              (unless (zerop (get-val cm.svgd:transport))
@@ -307,6 +248,56 @@
 
 ;;;(funcall my-watch)
 
+(defun svg->browser (svg-file &key (bar-lines 1) (staff-systems 1)
+                                (piano-roll 0) (scale 9.5)
+                                (timescale 5/32) (inverse 0) (ampoffs 0))
+  "display svg file in browser at \"https://localhost:8080/svg-display\""
+  (set-val cm.svgd:svg-file svg-file)
+  (set-val cm.svgd:piano-roll piano-roll)
+  (set-val cm.svgd:staff-systems staff-systems)
+  (set-val cm.svgd:bar-lines bar-lines)
+  (set-val cm.svgd:scale scale)
+  (set-val cm.svgd:inverse inverse)
+  (if cm.svgd:data-watch (funcall cm.svgd:data-watch))
+  (if cm.svgd:play-watch (funcall cm.svgd:play-watch))
+  (if cm.svgd:timescale-watch (funcall cm.svgd:timescale-watch))
+  (set-val cm.svgd:timescale timescale)
+  (setf cm.svgd:timescale-watch (watch (lambda () (setf *svg-x-scale* (get-val cm.svgd:timescale)))))
+  (setf cm.svgd:play-watch (watch (let ((last-pos 0))
+                                    (lambda () (if (zerop (get-val cm.svgd:transport))
+                                              (let (cl-refs::*curr-ref*)
+;;;                                        (format t "stopping~%")
+                                                (dolist (hook cm.svgd:*stop-hooks*) (funcall hook))
+                                                (rts-hush)
+                                                (unless (zerop (get-val cm.svgd:auto-return))
+                                                  (set-val cm.svgd:shift last-pos)))
+                                              (alexandria:if-let ((seq (get-val cm.svgd:seq)))
+                                                (let (cl-refs::*curr-ref*)
+;;;                                        (format t "relocating~%")
+                                                  (setf last-pos (get-val cm.svgd:shift))
+                                                  (dolist (hook cm.svgd:*play-hooks*) (funcall hook))
+                                                  (seq-play seq)
+                                                  (svg-play))
+                                                (error "seq not present: ~a" svg-file)))))))
+  (setf cm.svgd:data-watch
+        (watch (lambda ()
+                 (let ((filename (get-val cm.svgd:svg-file)))
+                   (unless (string= filename "")
+                     (format t "~&importing: ~a~%" (get-val cm.svgd:svg-file))
+                     (let ((seq
+                             (cm:import-events
+                              (namestring
+                               (merge-pathnames cm.svgd:svg-dir filename))
+                              :x-scale 1)))
+                       (set-val cm.svgd:timescale timescale)
+                       (format t "~&seq: ~a~%" seq)
+                       (set-val cm.svgd:seq seq)
+                       (when seq
+                         (setf (container-subobjects seq)
+                               (sort (subobjects seq) #'< :key #'object-time)))
+                       (values))))))))
+
+(init-svg-display)
 
 #|
 

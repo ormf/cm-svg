@@ -13,7 +13,16 @@
 
 (in-package :cm)
 
-(defparameter *svg-fn-assoc* nil)
+(defparameter *svg-fn-assoc-syms* nil
+  "indirection: We keep the syms of the functions in a separate assoc
+list and generate the \"real\" functions with the function
+#'create-svg-fn-assoc. This enables easier incorporation of
+redefinitions of the functions into the framework.")
+
+(defparameter *svg-fn-assoc* nil
+  "the assoc list associationg 'type in the attribute of a svg line to
+the function which digests it and turns it into a cm object. This Lit
+gets generataed from *svg-fn-assoc-syms* using #'create-svg-fn-assoc")
 
 ;;; xml is picky with quotes in attributes, therefore we keep a list
 ;;; of properties in an attribute of an svg element which should get
@@ -31,12 +40,21 @@
 
 (defun add-svg-assoc-fns (fn-assoc-seq)
   (mapc (lambda (fn-assoc)
-          (remove-svg-assoc-fn (first fn-assoc))
-          (pushnew fn-assoc *svg-fn-assoc* :test #'equal :key #'first))
+          (destructuring-bind (type . fn-sym) fn-assoc
+            (remove-svg-assoc-fn type)
+            (pushnew fn-assoc *svg-fn-assoc-syms* :test #'equal :key #'first)
+            (pushnew (cons type (symbol-function fn-sym)) *svg-fn-assoc* :test #'equal :key #'first)))
         fn-assoc-seq)
   *svg-fn-assoc*)
 
+(defun create-svg-fn-assoc ()
+  (mapcar (lambda (fn-assoc)
+            (destructuring-bind (type . fn-sym) fn-assoc
+              (pushnew (cons type (symbol-function fn-sym)) *svg-fn-assoc* :test #'equal :key #'first)))
+        *svg-fn-assoc-syms*))
+
 (defun remove-svg-assoc-fn (sym)
+  (setf *svg-fn-assoc-syms* (delete-if (lambda (assoc) (eql assoc sym)) *svg-fn-assoc-syms* :key #'first))
   (setf *svg-fn-assoc* (delete-if (lambda (assoc) (eql assoc sym)) *svg-fn-assoc* :key #'first))
   *svg-fn-assoc*)
 
@@ -508,11 +526,11 @@ svg element."
   (apply #'make-instance 'midi-program-change
          (ou:get-props-list args '(:time :program :channel))))
 
-(add-svg-assoc-fns `((midi . ,(symbol-function 'svg->midi))))
-(add-svg-assoc-fns `((midi-note-on . ,(symbol-function 'svg->midi-note-on))))
-(add-svg-assoc-fns `((midi-note-off . ,(symbol-function 'svg->midi-note-off))))
-(add-svg-assoc-fns `((midi-control-change . ,(symbol-function 'svg->midi-control-change))))
-(add-svg-assoc-fns `((midi-program-change . ,(symbol-function 'svg->midi-program-change))))
+(add-svg-assoc-fns '((midi . svg->midi)))
+(add-svg-assoc-fns '((midi-note-on . svg->midi-note-on)))
+(add-svg-assoc-fns '((midi-note-off . svg->midi-note-off)))
+(add-svg-assoc-fns '((midi-control-change . svg->midi-control-change)))
+(add-svg-assoc-fns '((midi-program-change . svg->midi-program-change)))
 
 #|
 (defun get-props-list (attributes &rest props)

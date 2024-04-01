@@ -618,7 +618,7 @@ svg element."
 (defun svg-lines->cm (svg-lines &key (x-offset 0) (x-scale 1) end colormap)
   (loop
     for elem in svg-lines
-    append (with-slots (svg-ie::x1 svg-ie::y1 svg-ie::x2 svg-ie::color svg-ie::opacity svg-ie::attributes)
+    append (with-slots (svg-ie::x1 svg-ie::y1 svg-ie::x2 svg-ie::y2 svg-ie::color svg-ie::opacity svg-ie::attributes)
                elem
              (if (or (not end) (<= (* x-scale svg-ie::x1) end))
                  (progn
@@ -629,6 +629,7 @@ svg element."
                          (list
                           (recreate-from-attributes (list* :time (float (+ x-offset (* x-scale svg-ie::x1)))
                                                            :keynum svg-ie::y1
+                                                           :y2 svg-ie::y2
                                                            :duration (float (max 0.001 (* x-scale (- svg-ie::x2 svg-ie::x1))))
                                                            :amplitude svg-ie::opacity
                                                            (keynum->saved-keynum svg-ie::attributes)))))
@@ -709,12 +710,13 @@ svg element."
 
 (defparameter *svg-x-scale* 1/32)
 
-(defun inkscape-export->cm (svg-evts &key (x-scale 1/32))
+(defun inkscape-export->cm (svg-evts &key (x-scale 1/32) (colormap *svg-colormap*))
   "convert svg elems exported by the inkscape 'Play Selection' extension
 to sproutable cm-events."
   (let* ((evts (sort (mapcar #'svg-ie:make-cm-line (sanitize-x-coords svg-evts)) #'< :key (lambda (x) (slot-value x 'svg-ie:x1))))
-         (x-offs (* -1 x-scale (slot-value (first evts) 'svg-ie::x1))))    
-    (svg-lines->cm evts :x-offset x-offs :x-scale x-scale)))
+         (x-offs (* -1 x-scale (slot-value (first evts) 'svg-ie::x1))))
+;;;    (break "~a" (mapcar (lambda (e) (slot-value e 'svg-import-export::color)) evts))
+    (svg-lines->cm evts :x-offset x-offs :x-scale x-scale :colormap colormap)))
 
 
 (export '(SVG->CM *SVG-COLORMAP-OLD* *SVG-COLORMAP* COLOR->CHAN CHAN->COLOR ADD-RECREATION-FN OPACITY->DB DB->OPACITY SVG-LINES->CM

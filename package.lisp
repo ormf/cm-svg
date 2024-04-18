@@ -20,8 +20,8 @@
 
 (in-package :cm)
 
-(shadow '(start) 'cm)
-(shadowing-import '(trigger) 'cl-refs)
+(shadow '(start trigger) 'cm)
+;;; (shadowing-import '(trigger) 'cl-refs)
 ;;; (shadowing-import '(start) 'clog-dsp-widgets)
 (use-package '(#:cl-refs #:clog-dsp-widgets))
 

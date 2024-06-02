@@ -110,11 +110,9 @@ use one of :global :piano-roll-vis :staff-system-vis :bar-lines-vis :showgrid :x
 ;;; method actually writes the file."
 
 (defmethod close-io ((io svg-file) &rest mode)
-  (break "mode: ~a" mode)
   (let ((err? (and (not (null mode)) (eq (car mode) ':error))))
     (setf (io-open io) nil)
     (unless err?
-      (break "entering cm-svg-export ~a :err?")
       (cm-svg-export
        :fname (sv io :name)
        :events (svg-file-events io)

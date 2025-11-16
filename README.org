@@ -1,3 +1,13 @@
+* This Repository is deprecated!
+
+  The cm-svg repository has been completely integrated into [[https://codeberg.org/ormf/clamps][Clamps]] and
+  is developed there. The archive here is kept only for historical
+  reasons. This archive will not receive further updates or
+  patches. Issues and pull requests will not be looked at here either,
+  please submit your patches and issue tickets on the Clamps
+  repository on Codeberg, or send them directly via good old email
+  patches to the author.
+
 cm-svg adds a svg backend to cm. It is a seperate package depending on
 [[https://github.com/ormf/svg-import-export][svg-import-export]] and the common lisp version of [[https://github.com/ormf/cm][Common Music]].
 
